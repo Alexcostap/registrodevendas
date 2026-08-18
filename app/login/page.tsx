@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Script from "next/script";
 import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "../../lib/supabase/client";
 
 // Callback global que o widget do Turnstile chama quando o usuário
 // resolve o desafio. Guardamos o token pra mandar junto no login.

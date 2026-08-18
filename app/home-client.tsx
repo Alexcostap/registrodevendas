@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { PlusCircle, PackageSearch, LogOut } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "../lib/supabase/client";
 
 export default function HomeClient({ nome }: { nome: string }) {
   const supabase = createClient();
