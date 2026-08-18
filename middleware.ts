@@ -31,12 +31,22 @@ export async function middleware(request: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
-  const isLoginPage = request.nextUrl.pathname.startsWith("/login");
+  const pathname = request.nextUrl.pathname;
+  // /login/definir-senha PRECISA de sessão ativa (criada em
+  // verificar-identidade) — não pode ser tratada como "página de login
+  // para deslogados", senão o usuário é chutado pra Home antes de
+  // conseguir criar o PIN.
+  const isPaginaDeslogado = pathname === "/login" || pathname === "/login/primeiro-acesso";
+  const isAreaLogin = pathname.startsWith("/login");
 
-  if (!session && !isLoginPage) {
+  if (!session && isAreaLogin && !isPaginaDeslogado) {
+    // ex: acessou /login/definir-senha sem sessão -> manda pro login normal
     return NextResponse.redirect(new URL("/login", request.url));
   }
-  if (session && isLoginPage) {
+  if (!session && !isAreaLogin) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+  if (session && isPaginaDeslogado) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

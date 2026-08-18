@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import Script from "next/script";
 import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { createClient } from "../../lib/supabase/client";
+import { maskCPF, maskPin, somenteDigitos } from "../../lib/mascaras";
 
-// Callback global que o widget do Turnstile chama quando o usuário
-// resolve o desafio. Guardamos o token pra mandar junto no login.
 declare global {
   interface Window {
     onTurnstileSuccess?: (token: string) => void;
@@ -15,9 +15,9 @@ declare global {
 }
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
-  const [showSenha, setShowSenha] = useState(false);
+  const [cpf, setCpf] = useState("");
+  const [pin, setPin] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -31,9 +31,10 @@ export default function LoginPage() {
 
   async function handleSubmit() {
     setError("");
+    const cpfDigitos = somenteDigitos(cpf);
 
-    if (!email || !senha) {
-      setError("Preencha e-mail e senha.");
+    if (cpfDigitos.length !== 11 || pin.length < 4) {
+      setError("Preencha CPF completo e o PIN.");
       return;
     }
     if (turnstileSiteKey && !captchaToken) {
@@ -42,16 +43,16 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+    const emailSintetico = `cpf${cpfDigitos}@jovi.internal`;
     const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password: senha,
+      email: emailSintetico,
+      password: pin,
       options: captchaToken ? { captchaToken } : undefined,
     });
     setLoading(false);
 
     if (authError) {
-      setError("E-mail ou senha inválidos.");
-      // reseta o captcha pra exigir nova resolução na próxima tentativa
+      setError("CPF ou PIN inválidos.");
       if (window.turnstile) window.turnstile.reset();
       setCaptchaToken(null);
       return;
@@ -79,48 +80,44 @@ export default function LoginPage() {
 
           <div className="rounded-xl p-7 bg-white shadow-xl">
             <h1 className="text-xl font-bold mb-1 text-[#0B1440]">Entrar</h1>
-            <p className="text-sm mb-6 text-[#6B7699]">Use seu e-mail pessoal cadastrado e sua senha.</p>
+            <p className="text-sm mb-6 text-[#6B7699]">Use seu CPF e o PIN que você criou.</p>
 
             <div className="space-y-3.5">
               <div>
-                <label className="block text-xs font-semibold mb-1.5 text-[#0B1440]">E-mail</label>
+                <label className="block text-xs font-semibold mb-1.5 text-[#0B1440]">CPF</label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seu@email.com"
-                  autoComplete="email"
+                  type="text"
+                  inputMode="numeric"
+                  value={cpf}
+                  onChange={(e) => setCpf(maskCPF(cpf, e.target.value))}
+                  placeholder="000.000.000-00"
                   className="w-full rounded-md border border-[#DCE1F5] py-2.5 px-3 text-sm outline-none text-[#0B1440]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold mb-1.5 text-[#0B1440]">Senha</label>
+                <label className="block text-xs font-semibold mb-1.5 text-[#0B1440]">PIN</label>
                 <div className="relative">
                   <input
-                    type={showSenha ? "text" : "password"}
-                    value={senha}
-                    onChange={(e) => setSenha(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="current-password"
+                    type={showPin ? "text" : "password"}
+                    inputMode="numeric"
+                    value={pin}
+                    onChange={(e) => setPin(maskPin(e.target.value))}
+                    placeholder="••••••"
                     className="w-full rounded-md border border-[#DCE1F5] py-2.5 pl-3 pr-10 text-sm outline-none text-[#0B1440]"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowSenha(!showSenha)}
+                    onClick={() => setShowPin(!showPin)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7699]"
                   >
-                    {showSenha ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
 
               {turnstileSiteKey && (
-                <div
-                  className="cf-turnstile"
-                  data-sitekey={turnstileSiteKey}
-                  data-callback="onTurnstileSuccess"
-                />
+                <div className="cf-turnstile" data-sitekey={turnstileSiteKey} data-callback="onTurnstileSuccess" />
               )}
 
               {error && (
@@ -143,11 +140,20 @@ export default function LoginPage() {
                   "Entrar"
                 )}
               </button>
+
+              <div className="flex justify-between text-xs pt-1">
+                <Link href="/login/primeiro-acesso" className="text-[#1E46E6] font-semibold">
+                  Primeiro acesso
+                </Link>
+                <Link href="/login/primeiro-acesso" className="text-[#6B7699]">
+                  Esqueci meu PIN
+                </Link>
+              </div>
             </div>
           </div>
 
           <p className="text-center text-xs mt-5 text-[#B9C4F0]">
-            Acesso restrito a promotores cadastrados.
+            Acesso restrito a promotores e supervisores cadastrados.
           </p>
         </div>
       </div>
