@@ -4,7 +4,7 @@
 // Anthropic diretamente — do contrário a chave vazaria no bundle do navegador.
 
 import { NextResponse } from "next/server";
-import { createClient } from "../../lib/supabase/server";
+import { createClient } from "../../../lib/supabase/server";
 
 const LIMITE_REQUISICOES = 20; // por usuário, por janela
 const JANELA_SEGUNDOS = 3600; // 1 hora
