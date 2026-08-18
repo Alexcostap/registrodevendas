@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     // ---- Busca em Promotores, depois Supervisores ----
     const dataISO = `${nascimento.slice(4, 8)}-${nascimento.slice(2, 4)}-${nascimento.slice(0, 2)}`;
 
-    async function buscar(tabela: "Promotores" | "Supervisores") {
+    const buscar = async (tabela: "Promotores" | "Supervisores") => {
       const { data, error } = await admin
         .schema("JOVI")
         .from(tabela)
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
         .filter("CPF", "not.is", null);
       if (error) throw new Error(`Falha ao consultar ${tabela}: ${error.message}`);
       return (data || []).find((linha: any) => somenteDigitos(linha.CPF) === cpf);
-    }
+    };
 
     let tabela: "Promotores" | "Supervisores" = "Promotores";
     let pessoa = await buscar("Promotores");
