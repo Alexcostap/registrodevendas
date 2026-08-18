@@ -32,6 +32,17 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getSession();
 
   const pathname = request.nextUrl.pathname;
+
+  // Rotas de API cuidam da própria autenticação (cada handler já confere
+  // a sessão internamente e devolve 401 em JSON quando precisa). O
+  // middleware NUNCA deve redirecionar uma chamada de API pra uma página
+  // HTML — isso quebra o método HTTP (POST vira 405 ao "seguir" pra uma
+  // página que só aceita GET).
+  const isApiRoute = pathname.startsWith("/api");
+  if (isApiRoute) {
+    return response;
+  }
+
   // /login/definir-senha PRECISA de sessão ativa (criada em
   // verificar-identidade) — não pode ser tratada como "página de login
   // para deslogados", senão o usuário é chutado pra Home antes de
