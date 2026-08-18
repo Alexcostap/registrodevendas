@@ -32,6 +32,14 @@ export function somenteDigitos(valor: string): string {
   return valor.replace(/\D/g, "");
 }
 
+// Extrai o primeiro nome de um nome completo e capitaliza só a
+// primeira letra (ex: "ALEX COSTA PEREIRA" -> "Alex")
+export function primeiroNomeCapitalizado(nomeCompleto: string): string {
+  if (!nomeCompleto) return "";
+  const primeiro = nomeCompleto.trim().split(/\s+/)[0].toLowerCase();
+  return primeiro.charAt(0).toUpperCase() + primeiro.slice(1);
+}
+
 // Converte "DD/MM/AAAA" em "AAAA-MM-DD" (formato de data do Postgres/JS)
 export function dataParaISO(dataBR: string): string | null {
   const digitos = somenteDigitos(dataBR);
