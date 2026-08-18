@@ -116,6 +116,18 @@ export async function POST(request: Request) {
         .from(tabela)
         .update({ auth_user_id: authUserId })
         .eq("id", pessoa.id);
+    } else {
+      // já existe uma conta vinculada (pode ser de um fluxo antigo, com
+      // outro e-mail) — garante que o e-mail bate com o padrão CPF, senão
+      // o generateLink abaixo cria uma conta NOVA e órfã em vez de
+      // reaproveitar esta, e a pessoa fica com duas contas duplicadas.
+      const { error: erroAtualizarEmail } = await admin.auth.admin.updateUserById(authUserId, {
+        email: emailSintetico,
+        email_confirm: true,
+      });
+      if (erroAtualizarEmail) {
+        console.error("Erro ao migrar e-mail da conta existente:", erroAtualizarEmail);
+      }
     }
 
     // Gera um link de acesso e troca por uma sessão real — a pessoa fica

@@ -26,7 +26,9 @@ export async function POST(request: Request) {
 
   // 2) Rate limit por usuário — impede que uma conta comprometida ou
   //    um script abusivo esgote a cota (paga) da API da Anthropic.
-  const { data: permitido, error: rlError } = await supabase.rpc(
+  const { data: permitido, error: rlError } = await supabase
+    .schema("JOVI")
+    .rpc(
     "checar_rate_limit_ocr",
     {
       p_auth_user_id: user.id,
@@ -35,7 +37,14 @@ export async function POST(request: Request) {
     }
   );
 
-  if (rlError || !permitido) {
+  if (rlError) {
+    console.error("Erro ao checar rate limit de OCR:", rlError);
+    return NextResponse.json(
+      { error: "Não foi possível processar agora. Tente novamente." },
+      { status: 500 }
+    );
+  }
+  if (!permitido) {
     return NextResponse.json(
       { error: "Limite de requisições excedido. Tente novamente mais tarde." },
       { status: 429 }

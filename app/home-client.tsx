@@ -17,7 +17,7 @@ export default function HomeClient({ nome }: { nome: string }) {
       <div className="w-full max-w-sm mt-6">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <div className="text-xs text-[#6B7699]">Bem-vinda,</div>
+            <div className="text-xs text-[#6B7699]">Olá,</div>
             <div className="text-xl font-bold text-[#0B1440]">{nome}</div>
           </div>
           <button onClick={handleLogout} aria-label="Sair">
