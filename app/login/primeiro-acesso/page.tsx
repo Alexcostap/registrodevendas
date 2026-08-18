@@ -22,20 +22,25 @@ export default function PrimeiroAcessoPage() {
     }
 
     setLoading(true);
-    const response = await fetch("/api/auth/verificar-identidade", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cpf: cpfDigitos, nascimento: nascimentoDigitos }),
-    });
-    const data = await response.json();
-    setLoading(false);
+    try {
+      const response = await fetch("/api/auth/verificar-identidade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cpf: cpfDigitos, nascimento: nascimentoDigitos }),
+      });
+      const data = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
-      setError(data.error || "Não foi possível verificar seus dados.");
-      return;
+      if (!response.ok) {
+        setError(data.error || `Não foi possível verificar seus dados (erro ${response.status}).`);
+        return;
+      }
+
+      window.location.href = "/login/definir-senha";
+    } catch (err) {
+      setError("Falha de conexão. Tente novamente.");
+    } finally {
+      setLoading(false);
     }
-
-    window.location.href = "/login/definir-senha";
   }
 
   return (

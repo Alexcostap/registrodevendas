@@ -22,20 +22,25 @@ export default function DefinirSenhaPage() {
     }
 
     setLoading(true);
-    const response = await fetch("/api/auth/definir-senha", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ novaSenha: pin }),
-    });
-    const data = await response.json();
-    setLoading(false);
+    try {
+      const response = await fetch("/api/auth/definir-senha", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ novaSenha: pin }),
+      });
+      const data = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
-      setError(data.error || "Não foi possível salvar o PIN.");
-      return;
+      if (!response.ok) {
+        setError(data.error || `Não foi possível salvar o PIN (erro ${response.status}).`);
+        return;
+      }
+
+      window.location.href = "/";
+    } catch (err) {
+      setError("Falha de conexão. Tente novamente.");
+    } finally {
+      setLoading(false);
     }
-
-    window.location.href = "/";
   }
 
   return (
