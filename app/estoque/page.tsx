@@ -2,13 +2,26 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Store, MapPin, Building2, Smartphone, Palette, Minus, Plus, Check, Loader2, AlertCircle, PlusCircle } from "lucide-react";
+import { Store, MapPin, Building2, Smartphone, Palette, Minus, Plus, Check, Loader2, AlertCircle, PlusCircle, X } from "lucide-react";
 import { createClient } from "../../lib/supabase/client";
 import { Shell, Header, TypeableSelect, FixedSelect } from "../_components/ui";
 
 type LojaRow = { id: number; CUSTOMER: string; UF: string; CIDADE: string; LOJA: string };
 type ModeloRow = { id: number; MODELO: string };
 type CorRow = { id: number; COR: string };
+
+type ItemEstoque = {
+  modeloNome: string;
+  modeloId: number | null;
+  corNome: string;
+  corId: number | null;
+  qtd: number;
+  carregandoQtd: boolean;
+};
+
+function itemVazio(): ItemEstoque {
+  return { modeloNome: "", modeloId: null, corNome: "", corId: null, qtd: 0, carregandoQtd: false };
+}
 
 function EstoqueConteudo() {
   const supabase = createClient();
@@ -71,48 +84,90 @@ function EstoqueConteudo() {
     if (encontrada) setEtapa("form");
   }
 
-  const [modeloNome, setModeloNome] = useState("");
-  const [modeloId, setModeloId] = useState<number | null>(null);
-  const [corNome, setCorNome] = useState("");
-  const [corId, setCorId] = useState<number | null>(null);
-  const [qtd, setQtd] = useState(0);
-  const [carregandoQtdAtual, setCarregandoQtdAtual] = useState(false);
+  // ---- lista de itens (modelo + cor + quantidade), repetível ----
+  const [itens, setItens] = useState<ItemEstoque[]>([itemVazio()]);
   const [salvando, setSalvando] = useState(false);
   const [erroSalvar, setErroSalvar] = useState("");
 
-  // Ao escolher modelo+cor, pré-carrega a quantidade JÁ existente pra
-  // não zerar sem querer um estoque que já tinha contagem.
-  useEffect(() => {
-    if (!lojaId || !modeloId || !corId) return;
-    (async () => {
-      setCarregandoQtdAtual(true);
-      const { data } = await supabase
-        .schema("JOVI")
-        .from("Estoque")
-        .select("quantidade")
-        .eq("loja_id", lojaId)
-        .eq("modelo_id", modeloId)
-        .eq("cor_id", corId)
-        .maybeSingle();
-      setQtd((data as any)?.quantidade ?? 0);
-      setCarregandoQtdAtual(false);
-    })();
-  }, [lojaId, modeloId, corId]);
+  function atualizarItem(index: number, mudanca: Partial<ItemEstoque>) {
+    setItens((prev) => {
+      const copia = [...prev];
+      copia[index] = { ...copia[index], ...mudanca };
+      return copia;
+    });
+  }
+
+  async function carregarQuantidadeAtual(index: number, modeloId: number, corId: number) {
+    atualizarItem(index, { carregandoQtd: true });
+    const { data } = await supabase
+      .schema("JOVI")
+      .from("Estoque")
+      .select("quantidade")
+      .eq("loja_id", lojaId)
+      .eq("modelo_id", modeloId)
+      .eq("cor_id", corId)
+      .maybeSingle();
+    atualizarItem(index, { qtd: (data as any)?.quantidade ?? 0, carregandoQtd: false });
+  }
+
+  function handleSelecionarModelo(index: number, nome: string) {
+    const modelo = modelos.find((m) => m.MODELO === nome);
+    const modeloId = modelo?.id ?? null;
+    atualizarItem(index, { modeloNome: nome, modeloId });
+    const corIdAtual = itens[index].corId;
+    if (modeloId && corIdAtual) carregarQuantidadeAtual(index, modeloId, corIdAtual);
+  }
+
+  function handleSelecionarCor(index: number, nome: string) {
+    const cor = cores.find((c) => c.COR === nome);
+    const corId = cor?.id ?? null;
+    atualizarItem(index, { corNome: nome, corId });
+    const modeloIdAtual = itens[index].modeloId;
+    if (modeloIdAtual && corId) carregarQuantidadeAtual(index, modeloIdAtual, corId);
+  }
+
+  function adicionarItem() {
+    setItens((prev) => [...prev, itemVazio()]);
+  }
+
+  function removerItem(index: number) {
+    setItens((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  const podeSalvarTodos =
+    itens.length > 0 && itens.every((i) => i.modeloId && i.corId && !i.carregandoQtd);
+
+  function temDuplicata(): boolean {
+    const chaves = itens.map((i) => `${i.modeloId}-${i.corId}`);
+    return new Set(chaves).size !== chaves.length;
+  }
 
   async function handleSalvar() {
     setErroSalvar("");
+    if (temDuplicata()) {
+      setErroSalvar("Você escolheu o mesmo modelo + cor mais de uma vez. Remova a duplicata.");
+      return;
+    }
     setSalvando(true);
     const { data: userData } = await supabase.auth.getUser();
-    const { error } = await supabase.schema("JOVI").rpc("upsert_estoque", {
-      p_loja_id: lojaId,
-      p_modelo_id: modeloId,
-      p_cor_id: corId,
-      p_quantidade: qtd,
-      p_atualizado_por: userData.user?.id ?? null,
-    });
+    const uid = userData.user?.id ?? null;
+
+    const resultados = await Promise.all(
+      itens.map((item) =>
+        supabase.schema("JOVI").rpc("upsert_estoque", {
+          p_loja_id: lojaId,
+          p_modelo_id: item.modeloId,
+          p_cor_id: item.corId,
+          p_quantidade: item.qtd,
+          p_atualizado_por: uid,
+        })
+      )
+    );
     setSalvando(false);
-    if (error) {
-      setErroSalvar("Não foi possível salvar. Tente novamente.");
+
+    const algumErro = resultados.find((r) => r.error);
+    if (algumErro) {
+      setErroSalvar("Não foi possível salvar um ou mais itens. Tente novamente.");
       return;
     }
     setEtapa("sucesso");
@@ -120,12 +175,12 @@ function EstoqueConteudo() {
 
   function irParaOutraLoja() {
     setRede(""); setUf(""); setCidade(""); setLojaNome(""); setLojaId(null);
-    setModeloNome(""); setModeloId(null); setCorNome(""); setCorId(null); setQtd(0);
+    setItens([itemVazio()]);
     setEtapa("loja");
   }
 
   function irParaMesmaLojaOutroItem() {
-    setModeloNome(""); setModeloId(null); setCorNome(""); setCorId(null); setQtd(0);
+    setItens([itemVazio()]);
     setEtapa("form");
   }
 
@@ -162,35 +217,52 @@ function EstoqueConteudo() {
   }
 
   if (etapa === "form") {
-    const podeSalvar = modeloId && corId && !carregandoQtdAtual;
     return (
       <Shell>
         <Header title="Atualizar estoque" backHref="/estoque" />
         <div className="text-xs font-semibold mb-5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#EAF0FF] text-[#1E46E6]">
           <Store size={12} /> {lojaNome}
         </div>
-        <div className="space-y-4">
-          <FixedSelect value={modeloNome} onChange={(v) => { setModeloNome(v); setModeloId(modelos.find((m) => m.MODELO === v)?.id ?? null); }} options={modelos.map((m) => m.MODELO)} placeholder="Aparelho" icon={Smartphone} />
-          <FixedSelect value={corNome} onChange={(v) => { setCorNome(v); setCorId(cores.find((c) => c.COR === v)?.id ?? null); }} options={cores.map((c) => c.COR)} placeholder="Cor" icon={Palette} />
 
-          <div>
-            <label className="block text-xs font-semibold mb-2 text-[#0B1440]">Quantidade em estoque</label>
-            <div className="flex items-center gap-3">
-              <button onClick={() => setQtd(Math.max(0, qtd - 1))} className="w-11 h-11 rounded-full flex items-center justify-center bg-[#EAF0FF] text-[#1E46E6]">
-                <Minus size={18} />
-              </button>
-              <div className="fonte-mono flex-1 text-center text-2xl font-bold rounded-md py-2 text-[#0B1440] bg-white border border-[#DCE1F5]">
-                {carregandoQtdAtual ? <Loader2 size={18} className="animate-spin inline" /> : qtd}
+        <div className="space-y-5">
+          {itens.map((item, index) => (
+            <div key={index} className="space-y-3 pb-5 border-b border-[#DCE1F5] last:border-b-0 last:pb-0">
+              <div className="flex items-center justify-between">
+                <span className="fonte-mono text-xs font-bold text-[#6B7699]">ITEM {index + 1}</span>
+                {itens.length > 1 && (
+                  <button onClick={() => removerItem(index)} className="text-[#6B7699]" aria-label="Remover item">
+                    <X size={16} />
+                  </button>
+                )}
               </div>
-              <button onClick={() => setQtd(qtd + 1)} className="w-11 h-11 rounded-full flex items-center justify-center bg-[#1E46E6] text-white">
-                <Plus size={18} />
-              </button>
+
+              <FixedSelect value={item.modeloNome} onChange={(v) => handleSelecionarModelo(index, v)} options={modelos.map((m) => m.MODELO)} placeholder="Aparelho" icon={Smartphone} />
+              <FixedSelect value={item.corNome} onChange={(v) => handleSelecionarCor(index, v)} options={cores.map((c) => c.COR)} placeholder="Cor" icon={Palette} />
+
+              <div>
+                <label className="block text-xs font-semibold mb-2 text-[#0B1440]">Quantidade em estoque</label>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => atualizarItem(index, { qtd: Math.max(0, item.qtd - 1) })} className="w-11 h-11 rounded-full flex items-center justify-center bg-[#EAF0FF] text-[#1E46E6]">
+                    <Minus size={18} />
+                  </button>
+                  <div className="fonte-mono flex-1 text-center text-2xl font-bold rounded-md py-2 text-[#0B1440] bg-white border border-[#DCE1F5]">
+                    {item.carregandoQtd ? <Loader2 size={18} className="animate-spin inline" /> : item.qtd}
+                  </div>
+                  <button onClick={() => atualizarItem(index, { qtd: item.qtd + 1 })} className="w-11 h-11 rounded-full flex items-center justify-center bg-[#1E46E6] text-white">
+                    <Plus size={18} />
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          ))}
+
+          <button onClick={adicionarItem} className="w-full flex items-center justify-center gap-1.5 text-sm font-semibold py-2 text-[#1E46E6] border-2 border-dashed border-[#1E46E6] rounded-md">
+            <PlusCircle size={16} /> Adicionar outro modelo
+          </button>
 
           {erroSalvar && <div className="flex items-start gap-2 text-xs rounded-md px-3 py-2 bg-red-50 text-red-700"><AlertCircle size={14} className="shrink-0 mt-0.5" />{erroSalvar}</div>}
 
-          <button disabled={!podeSalvar || salvando} onClick={handleSalvar} className="w-full rounded-md py-3 text-sm font-semibold mt-2 text-white flex items-center justify-center gap-2" style={{ background: podeSalvar ? "#1E46E6" : "#DCE1F5" }}>
+          <button disabled={!podeSalvarTodos || salvando} onClick={handleSalvar} className="w-full rounded-md py-3 text-sm font-semibold mt-2 text-white flex items-center justify-center gap-2" style={{ background: podeSalvarTodos ? "#1E46E6" : "#DCE1F5" }}>
             {salvando && <Loader2 size={16} className="animate-spin" />}
             Salvar estoque
           </button>
@@ -207,7 +279,12 @@ function EstoqueConteudo() {
           <Check size={26} color="#FFFFFF" />
         </div>
         <h2 className="fonte-titulo text-lg font-bold text-[#0B1440]">Estoque atualizado</h2>
-        <p className="text-sm text-[#6B7699]">{modeloNome} · {corNome} · {qtd} unid. · {lojaNome}</p>
+        <div className="text-sm text-[#6B7699] space-y-0.5">
+          {itens.map((item, i) => (
+            <p key={i}>{item.modeloNome} · {item.corNome} · {item.qtd} unid.</p>
+          ))}
+          <p className="mt-1">{lojaNome}</p>
+        </div>
       </div>
       <button onClick={irParaMesmaLojaOutroItem} className="w-full rounded-md py-3 text-sm font-semibold mb-3 text-white bg-[#1E46E6]">
         Atualizar outro item
