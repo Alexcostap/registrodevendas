@@ -97,6 +97,8 @@ export default function VendaPage() {
   const [imei, setImei] = useState("");
   const [imei2, setImei2] = useState("");
   const [numeroNota, setNumeroNota] = useState("");
+  const [dadosOcrNota, setDadosOcrNota] = useState<any>(null);
+  const [dadosOcrCaixa, setDadosOcrCaixa] = useState<any>(null);
   const [dataVenda, setDataVenda] = useState("");
   const [valor, setValor] = useState("");
 
@@ -166,6 +168,7 @@ export default function VendaPage() {
       if (parsed.numero_nota) setNumeroNota(String(parsed.numero_nota));
       if (parsed.data_venda) setDataVenda(String(parsed.data_venda));
       if (parsed.valor) setValor(String(parsed.valor));
+      setDadosOcrNota(parsed);
     } catch (e) {
       setOcrErrorNota("Não consegui ler a nota automaticamente. Confira/preencha os campos manualmente.");
     }
@@ -188,6 +191,7 @@ export default function VendaPage() {
       }
       if (parsed.imei1) setImei(String(parsed.imei1));
       if (parsed.imei2) setImei2(String(parsed.imei2));
+      setDadosOcrCaixa(parsed);
     } catch (e) {
       setOcrErrorCaixa("Não consegui ler a caixa automaticamente. Confira/preencha os campos manualmente.");
     }
@@ -218,6 +222,16 @@ export default function VendaPage() {
     return `${digitos.slice(4, 8)}-${digitos.slice(2, 4)}-${digitos.slice(0, 2)}`;
   }
 
+  async function uploadComprovante(file: File, prefixo: string): Promise<string | null> {
+    const caminho = `${lojaId}/${Date.now()}-${prefixo}-${file.name}`;
+    const { error } = await supabase.storage.from("comprovantes-venda").upload(caminho, file);
+    if (error) {
+      console.error(`Erro ao enviar foto (${prefixo}):`, error);
+      return null;
+    }
+    return caminho;
+  }
+
   async function handleRegistrarVenda() {
     setErroEnvio("");
     if (!promotorId) {
@@ -230,6 +244,13 @@ export default function VendaPage() {
       return;
     }
     setEnviando(true);
+
+    // Envia as fotos pro Storage antes de gravar a venda (se houver)
+    const [fotoUrlNota, fotoUrlCaixa] = await Promise.all([
+      fileNota ? uploadComprovante(fileNota, "nota") : Promise.resolve(null),
+      fileCaixa ? uploadComprovante(fileCaixa, "caixa") : Promise.resolve(null),
+    ]);
+
     const { error } = await supabase.schema("JOVI").from("Vendas").insert({
       promotor_id: promotorId,
       loja_id: lojaId,
@@ -243,6 +264,9 @@ export default function VendaPage() {
       nome_vendedor: nomeVendedor,
       sobrenome_vendedor: sobrenomeVendedor,
       observacao: observacao || null,
+      foto_url: fotoUrlNota,
+      foto_url_caixa: fotoUrlCaixa,
+      orc_bruto: (dadosOcrNota || dadosOcrCaixa) ? { nota: dadosOcrNota, caixa: dadosOcrCaixa } : null,
     });
     setEnviando(false);
 
@@ -259,6 +283,7 @@ export default function VendaPage() {
     setManualMode(false);
     setFileNota(null); setFileCaixa(null); setPreviewNota(null); setPreviewCaixa(null);
     setOcrErrorNota(""); setOcrErrorCaixa("");
+    setDadosOcrNota(null); setDadosOcrCaixa(null);
     setAparelhoNome(""); setAparelhoId(null);
     setCorNome(""); setCorId(null);
     setImei(""); setImei2(""); setNumeroNota(""); setDataVenda(""); setValor("");
