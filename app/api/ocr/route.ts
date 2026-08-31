@@ -68,13 +68,21 @@ export async function POST(request: Request) {
   }
 
   // 4) Chamada real à Anthropic — chave só existe aqui, nunca no client
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "x-api-key": process.env.ANTHROPIC_API_KEY!,
+    "anthropic-version": "2023-06-01",
+  };
+  // Chaves do tipo "identity-linked" (vinculadas a um usuário, não a um
+  // workspace único) exigem informar explicitamente em qual workspace
+  // a requisição deve rodar.
+  if (process.env.ANTHROPIC_WORKSPACE_ID) {
+    headers["anthropic-workspace-id"] = process.env.ANTHROPIC_WORKSPACE_ID;
+  }
+
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY!,
-      "anthropic-version": "2023-06-01",
-    },
+    headers,
     body: JSON.stringify({
       model: "claude-sonnet-5",
       max_tokens: 1000,

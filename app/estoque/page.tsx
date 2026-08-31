@@ -219,7 +219,7 @@ function EstoqueConteudo() {
   if (etapa === "form") {
     return (
       <Shell>
-        <Header title="Atualizar estoque" backHref="/estoque" />
+        <Header title="Atualizar estoque" onBack={irParaOutraLoja} />
         <div className="text-xs font-semibold mb-5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#EAF0FF] text-[#1E46E6]">
           <Store size={12} /> {lojaNome}
         </div>

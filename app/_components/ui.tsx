@@ -24,12 +24,26 @@ export function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Header({ title, backHref }: { title: string; backHref: string }) {
+export function Header({
+  title,
+  backHref,
+  onBack,
+}: {
+  title: string;
+  backHref?: string;
+  onBack?: () => void;
+}) {
   return (
     <div className="flex items-center gap-3 mb-5">
-      <Link href={backHref} className="text-[#6B7699]">
-        <ArrowLeft size={20} />
-      </Link>
+      {onBack ? (
+        <button onClick={onBack} className="text-[#6B7699]" aria-label="Voltar">
+          <ArrowLeft size={20} />
+        </button>
+      ) : (
+        <Link href={backHref || "/"} className="text-[#6B7699]">
+          <ArrowLeft size={20} />
+        </Link>
+      )}
       <h1 className="fonte-titulo text-lg font-bold flex-1 text-[#0B1440]">{title}</h1>
     </div>
   );
