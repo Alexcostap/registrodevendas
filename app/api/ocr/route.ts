@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
+      model: "claude-sonnet-5",
       max_tokens: 1000,
       messages: [
         {
@@ -91,7 +91,12 @@ export async function POST(request: Request) {
   });
 
   if (!response.ok) {
-    return NextResponse.json({ error: "Falha ao processar a imagem" }, { status: 502 });
+    const corpoErro = await response.text().catch(() => "");
+    console.error("Erro da API da Anthropic:", response.status, corpoErro);
+    return NextResponse.json(
+      { error: `Falha ao processar a imagem (Anthropic: ${response.status})` },
+      { status: 502 }
+    );
   }
 
   const data = await response.json();
