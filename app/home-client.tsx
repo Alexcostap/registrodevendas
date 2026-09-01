@@ -39,23 +39,6 @@ export default function HomeClient({
           </button>
         </div>
 
-        {ehPromotor && (
-          <Link
-            href="/ponto"
-            className="w-full rounded-xl p-5 mb-4 flex items-center gap-4 text-white"
-            style={{ background: turnoAberto ? "#1F8A70" : "#E8601C" }}
-          >
-            {turnoAberto ? <Clock size={28} /> : <LogIn size={28} />}
-            <div>
-              <div className="font-bold text-base">
-                {turnoAberto ? "Registrar saída da loja" : "Registrar entrada da loja"}
-              </div>
-              <div className="text-xs opacity-90">
-                {turnoAberto ? `Turno aberto desde ${horaEntrada}` : "Fotografe-se na chegada à loja"}
-              </div>
-            </div>
-          </Link>
-        )}
 
         <Link
           href="/venda"
@@ -78,6 +61,25 @@ export default function HomeClient({
             <div className="text-xs text-[#6B7699]">Contagem rápida por loja</div>
           </div>
         </Link>
+
+                {ehPromotor && (
+          <Link
+            href="/ponto"
+            className="w-full rounded-xl p-5 mb-4 flex items-center gap-4 text-white"
+            style={{ background: turnoAberto ? "#1F8A70" : "#E8601C" }}
+          >
+            {turnoAberto ? <Clock size={28} /> : <LogIn size={28} />}
+            <div>
+              <div className="font-bold text-base">
+                {turnoAberto ? "Registrar saída da loja" : "Registrar entrada da loja"}
+              </div>
+              <div className="text-xs opacity-90">
+                {turnoAberto ? `Turno aberto desde ${horaEntrada}` : "Fotografe-se na chegada à loja"}
+              </div>
+            </div>
+          </Link>
+        )}
+
       </div>
     </div>
   );
