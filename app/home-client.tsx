@@ -10,11 +10,13 @@ export default function HomeClient({
   nome,
   ehPromotor,
   ehSupervisor,
+  ehGestor,
   turnoAberto,
 }: {
   nome: string;
   ehPromotor: boolean;
   ehSupervisor: boolean;
+  ehGestor: boolean;
   turnoAberto: TurnoAberto;
 }) {
   const supabase = createClient();
@@ -81,14 +83,14 @@ export default function HomeClient({
           </Link>
         )}
 
-        {ehSupervisor && (
+        {(ehSupervisor || ehGestor) && (
           <Link
             href="/escala"
             className="w-full rounded-xl p-5 flex items-center gap-4 border-2 border-[#1E46E6] bg-white text-[#0B1440]"
           >
             <CalendarClock size={28} className="text-[#1E46E6]" />
             <div>
-              <div className="font-bold text-base">Escala da equipe</div>
+              <div className="font-bold text-base">{ehGestor ? "Escala (todos os promotores)" : "Escala da equipe"}</div>
               <div className="text-xs text-[#6B7699]">Dia, horário e loja de cada promotor</div>
             </div>
           </Link>

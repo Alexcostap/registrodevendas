@@ -36,13 +36,16 @@ export default function EscalaPage() {
   const [carregando, setCarregando] = useState(true);
   const [erroCarregar, setErroCarregar] = useState("");
 
-  async function carregarEscalas(supId: number) {
-    const { data } = await supabase
+  const [modoGestor, setModoGestor] = useState(false);
+
+  async function carregarEscalas(supId: number | null) {
+    let query = supabase
       .schema("JOVI")
       .from("Escala")
       .select("id, promotor_id, loja_id, dia, dia_semana, horario_inicio, horario_fim")
-      .eq("supervisor_id", supId)
       .order("dia", { ascending: true });
+    if (supId !== null) query = query.eq("supervisor_id", supId);
+    const { data } = await query;
     setEscalas((data as any) || []);
   }
 
@@ -60,21 +63,44 @@ export default function EscalaPage() {
           .eq("auth_user_id", uid)
           .maybeSingle();
 
-        if (!supervisor) {
-          setErroCarregar("Só supervisores acessam a escala da equipe.");
+        if (supervisor) {
+          // fluxo normal: supervisor só vê a própria equipe
+          const supId = (supervisor as any).id;
+          setSupervisorId(supId);
+
+          const [promotoresRes, lojasRes] = await Promise.all([
+            supabase.schema("JOVI").from("Promotores").select("id, NOME_COMPLETO").eq("SUPERVISOR", supId),
+            supabase.schema("JOVI").from("Lojas").select("id:ID, CUSTOMER, UF, CIDADE, LOJA"),
+          ]);
+          setPromotores((promotoresRes.data as any) || []);
+          setLojas((lojasRes.data as any) || []);
+          await carregarEscalas(supId);
           setCarregando(false);
           return;
         }
-        const supId = (supervisor as any).id;
-        setSupervisorId(supId);
 
+        // não é supervisor — confere se é gestor (acesso total)
+        const { data: promotorProprio } = await supabase
+          .schema("JOVI")
+          .from("Promotores")
+          .select("is_gestor")
+          .eq("auth_user_id", uid)
+          .maybeSingle();
+
+        if (!promotorProprio?.is_gestor) {
+          setErroCarregar("Só supervisores ou gestores acessam a escala da equipe.");
+          setCarregando(false);
+          return;
+        }
+
+        setModoGestor(true);
         const [promotoresRes, lojasRes] = await Promise.all([
-          supabase.schema("JOVI").from("Promotores").select("id, NOME_COMPLETO").eq("SUPERVISOR", supId),
+          supabase.schema("JOVI").from("Promotores").select("id, NOME_COMPLETO").order("NOME_COMPLETO"),
           supabase.schema("JOVI").from("Lojas").select("id:ID, CUSTOMER, UF, CIDADE, LOJA"),
         ]);
         setPromotores((promotoresRes.data as any) || []);
         setLojas((lojasRes.data as any) || []);
-        await carregarEscalas(supId);
+        await carregarEscalas(null); // gestor vê TODAS as escalas
       } catch (e) {
         setErroCarregar("Não foi possível carregar os dados. Recarregue a página.");
       } finally {
@@ -130,18 +156,18 @@ export default function EscalaPage() {
 
   async function handleAdicionar() {
     setErroSalvar("");
-    if (!supervisorId || !podeSalvar) return;
+    if ((!supervisorId && !modoGestor) || !podeSalvar) return;
     setSalvando(true);
 
     const base = {
-      supervisor_id: supervisorId,
+      supervisor_id: supervisorId, // null no modo gestor — coluna aceita null
       promotor_id: promotorId,
       loja_id: lojaId,
       horario_inicio: horarioInicio || null,
       horario_fim: horarioFim || null,
     };
 
-    const linhas: { supervisor_id: number; promotor_id: number; loja_id: number; horario_inicio: string | null; horario_fim: string | null; dia: string | null; dia_semana: number | null }[] =
+    const linhas: { supervisor_id: number | null; promotor_id: number; loja_id: number; horario_inicio: string | null; horario_fim: string | null; dia: string | null; dia_semana: number | null }[] =
       modo === "pontual"
         ? [{ ...base, dia, dia_semana: null }]
         : diasSemanaSelecionados.map((d) => ({ ...base, dia: null, dia_semana: d }));
@@ -153,13 +179,13 @@ export default function EscalaPage() {
       return;
     }
     limparFormulario();
-    await carregarEscalas(supervisorId);
+    await carregarEscalas(modoGestor ? null : supervisorId);
   }
 
   async function handleRemover(id: number) {
-    if (!supervisorId) return;
+    if (!supervisorId && !modoGestor) return;
     await supabase.schema("JOVI").from("Escala").delete().eq("id", id);
-    await carregarEscalas(supervisorId);
+    await carregarEscalas(modoGestor ? null : supervisorId);
   }
 
   function nomePromotor(id: number) {
@@ -205,7 +231,7 @@ export default function EscalaPage() {
 
   return (
     <Shell>
-      <Header title="Escala da equipe" backHref="/" />
+      <Header title={modoGestor ? "Escala (todos os promotores)" : "Escala da equipe"} backHref="/" />
 
       <div className="rounded-lg border border-[#DCE1F5] bg-white p-5 mb-5 space-y-3">
         <div className="fonte-titulo text-sm font-bold text-[#0B1440] mb-1">Novo apontamento</div>

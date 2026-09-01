@@ -20,12 +20,13 @@ export default async function HomePage() {
   const { data: promotor } = await supabase
     .schema("JOVI")
     .from("Promotores")
-    .select("id, NOME_COMPLETO")
+    .select("id, NOME_COMPLETO, is_gestor")
     .eq("auth_user_id", user!.id)
     .maybeSingle();
 
   let nomeCompleto = promotor?.NOME_COMPLETO;
   const ehPromotor = !!promotor;
+  const ehGestor = !!promotor?.is_gestor;
   let ehSupervisor = false;
 
   if (!nomeCompleto) {
@@ -60,6 +61,7 @@ export default async function HomePage() {
       nome={nomeExibido}
       ehPromotor={ehPromotor}
       ehSupervisor={ehSupervisor}
+      ehGestor={ehGestor}
       turnoAberto={turnoAberto}
     />
   );
