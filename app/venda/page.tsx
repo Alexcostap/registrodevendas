@@ -369,7 +369,7 @@ export default function VendaPage() {
                       {ocrLoadingNota ? <Loader2 size={20} className="animate-spin text-[#1E46E6]" /> : previewNota ? <img src={previewNota} alt="prévia nota" className="h-16 rounded-md object-cover" /> : <Receipt size={20} className="text-[#6B7699]" />}
                       <span className="text-xs font-medium text-[#0B1440]">{previewNota ? "✓ Nota anexada" : "Nota fiscal"}</span>
                       {!previewNota && <span className="text-[10px] text-[#6B7699]">nº nota, data, valor</span>}
-                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAnexarNota} />
+                      <input type="file" accept="image/*" className="hidden" onChange={handleAnexarNota} />
                     </label>
                     {ocrErrorNota && <div className="flex items-start gap-1 mt-1.5 text-[11px] text-red-700"><AlertCircle size={12} className="shrink-0 mt-0.5" />{ocrErrorNota}</div>}
                   </div>
@@ -378,7 +378,7 @@ export default function VendaPage() {
                       {ocrLoadingCaixa ? <Loader2 size={20} className="animate-spin text-[#1E46E6]" /> : previewCaixa ? <img src={previewCaixa} alt="prévia caixa" className="h-16 rounded-md object-cover" /> : <Box size={20} className="text-[#6B7699]" />}
                       <span className="text-xs font-medium text-[#0B1440]">{previewCaixa ? "✓ Caixa anexada" : "Foto da caixa"}</span>
                       {!previewCaixa && <span className="text-[10px] text-[#6B7699]">produto, cor, IMEI</span>}
-                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAnexarCaixa} />
+                      <input type="file" accept="image/*" className="hidden" onChange={handleAnexarCaixa} />
                     </label>
                     {ocrErrorCaixa && <div className="flex items-start gap-1 mt-1.5 text-[11px] text-red-700"><AlertCircle size={12} className="shrink-0 mt-0.5" />{ocrErrorCaixa}</div>}
                   </div>
