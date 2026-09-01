@@ -11,7 +11,7 @@ type EscalaRow = {
   id: number;
   promotor_id: number;
   loja_id: number;
-  dia: string | null;
+  dia: string;
   dia_semana: number | null;
   horario_inicio: string | null;
   horario_fim: string | null;
@@ -120,6 +120,7 @@ export default function EscalaPage() {
   const [lojaId, setLojaId] = useState<number | null>(null);
   const [dia, setDia] = useState("");
   const [diasSemanaSelecionados, setDiasSemanaSelecionados] = useState<number[]>([]);
+  const [dataFimRecorrencia, setDataFimRecorrencia] = useState("");
   const [horarioInicio, setHorarioInicio] = useState("");
   const [horarioFim, setHorarioFim] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -145,18 +146,52 @@ export default function EscalaPage() {
   const podeSalvar =
     !!promotorId &&
     !!lojaId &&
-    (modo === "pontual" ? !!dia : diasSemanaSelecionados.length > 0);
+    (modo === "pontual" ? !!dia : diasSemanaSelecionados.length > 0 && !!dataFimRecorrencia);
 
   function limparFormulario() {
     setPromotorNome(""); setPromotorId(null);
     setRede(""); setUf(""); setCidade(""); setLojaNome(""); setLojaId(null);
-    setDia(""); setDiasSemanaSelecionados([]);
+    setDia(""); setDiasSemanaSelecionados([]); setDataFimRecorrencia("");
     setHorarioInicio(""); setHorarioFim("");
+  }
+
+  // Gera uma data real para cada ocorrência de cada dia da semana
+  // escolhido, entre hoje e a data final (inclusive).
+  function gerarOcorrencias(diasSemana: number[], dataFimStr: string): { dia: string; dia_semana: number }[] {
+    const ocorrencias: { dia: string; dia_semana: number }[] = [];
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const fim = new Date(dataFimStr + "T00:00:00");
+    const cursor = new Date(hoje);
+    while (cursor <= fim) {
+      const diaSemanaJS = cursor.getDay(); // 0=domingo ... 6=sábado (1=segunda bate com nosso padrão)
+      if (diasSemana.includes(diaSemanaJS)) {
+        ocorrencias.push({ dia: cursor.toISOString().slice(0, 10), dia_semana: diaSemanaJS });
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return ocorrencias;
   }
 
   async function handleAdicionar() {
     setErroSalvar("");
     if ((!supervisorId && !modoGestor) || !podeSalvar) return;
+
+    if (modo === "recorrente") {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const fim = new Date(dataFimRecorrencia + "T00:00:00");
+      const diasDeIntervalo = (fim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24);
+      if (diasDeIntervalo < 0) {
+        setErroSalvar("A data final precisa ser hoje ou uma data futura.");
+        return;
+      }
+      if (diasDeIntervalo > 180) {
+        setErroSalvar("Escolha uma data final de até 180 dias à frente.");
+        return;
+      }
+    }
+
     setSalvando(true);
 
     const base = {
@@ -167,10 +202,16 @@ export default function EscalaPage() {
       horario_fim: horarioFim || null,
     };
 
-    const linhas: { supervisor_id: number | null; promotor_id: number; loja_id: number; horario_inicio: string | null; horario_fim: string | null; dia: string | null; dia_semana: number | null }[] =
+    const linhas: { supervisor_id: number | null; promotor_id: number; loja_id: number; horario_inicio: string | null; horario_fim: string | null; dia: string; dia_semana: number | null }[] =
       modo === "pontual"
         ? [{ ...base, dia, dia_semana: null }]
-        : diasSemanaSelecionados.map((d) => ({ ...base, dia: null, dia_semana: d }));
+        : gerarOcorrencias(diasSemanaSelecionados, dataFimRecorrencia).map((o) => ({ ...base, dia: o.dia, dia_semana: o.dia_semana }));
+
+    if (modo === "recorrente" && linhas.length === 0) {
+      setSalvando(false);
+      setErroSalvar("Nenhuma data cai nos dias escolhidos até a data final. Confira a seleção.");
+      return;
+    }
 
     const { error } = await supabase.schema("JOVI").from("Escala").insert(linhas);
     setSalvando(false);
@@ -199,15 +240,13 @@ export default function EscalaPage() {
 
   function formatarQuando(e: EscalaRow) {
     const horarios = e.horario_inicio ? ` · ${e.horario_inicio.slice(0, 5)}${e.horario_fim ? "–" + e.horario_fim.slice(0, 5) : ""}` : "";
-    if (e.dia_semana) {
-      const nome = DIAS_SEMANA.find((d) => d.valor === e.dia_semana)?.longo || "";
-      return `Toda ${nome}${horarios}`;
+    const [ano, mes, diaNum] = e.dia.split("-");
+    const dataFormatada = `${diaNum}/${mes}/${ano}`;
+    if (e.dia_semana !== null) {
+      const nome = DIAS_SEMANA.find((d) => d.valor === e.dia_semana)?.curto || "";
+      return `${dataFormatada} (${nome}, recorrente)${horarios}`;
     }
-    if (e.dia) {
-      const [ano, mes, diaNum] = e.dia.split("-");
-      return `${diaNum}/${mes}/${ano}${horarios}`;
-    }
-    return "—";
+    return `${dataFormatada}${horarios}`;
   }
 
   if (carregando) {
@@ -278,26 +317,38 @@ export default function EscalaPage() {
             />
           </div>
         ) : (
-          <div>
-            <label className="block text-xs font-semibold mb-2 text-[#0B1440]">Toda:</label>
-            <div className="flex flex-wrap gap-2">
-              {DIAS_SEMANA.map((d) => {
-                const selecionado = diasSemanaSelecionados.includes(d.valor);
-                return (
-                  <button
-                    key={d.valor}
-                    onClick={() => alternarDiaSemana(d.valor)}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold border"
-                    style={{
-                      background: selecionado ? "#1E46E6" : "#FFFFFF",
-                      color: selecionado ? "#FFFFFF" : "#0B1440",
-                      borderColor: selecionado ? "#1E46E6" : "#DCE1F5",
-                    }}
-                  >
-                    {d.curto}
-                  </button>
-                );
-              })}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold mb-2 text-[#0B1440]">Toda:</label>
+              <div className="flex flex-wrap gap-2">
+                {DIAS_SEMANA.map((d) => {
+                  const selecionado = diasSemanaSelecionados.includes(d.valor);
+                  return (
+                    <button
+                      key={d.valor}
+                      onClick={() => alternarDiaSemana(d.valor)}
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold border"
+                      style={{
+                        background: selecionado ? "#1E46E6" : "#FFFFFF",
+                        color: selecionado ? "#FFFFFF" : "#0B1440",
+                        borderColor: selecionado ? "#1E46E6" : "#DCE1F5",
+                      }}
+                    >
+                      {d.curto}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1.5 text-[#0B1440]">Repetir até (data final) *</label>
+              <input
+                type="date"
+                value={dataFimRecorrencia}
+                onChange={(e) => setDataFimRecorrencia(e.target.value)}
+                className="w-full rounded-md border border-[#DCE1F5] bg-white py-2.5 px-3 text-sm outline-none text-[#0B1440]"
+              />
+              <p className="text-[10px] text-[#6B7699] mt-1">Uma linha será criada para cada data real entre hoje e essa data, nos dias marcados acima.</p>
             </div>
           </div>
         )}
