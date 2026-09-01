@@ -48,7 +48,7 @@ export default function HomeClient({
             {turnoAberto ? <Clock size={28} /> : <LogIn size={28} />}
             <div>
               <div className="font-bold text-base">
-                {turnoAberto ? "Registrar saída" : "Registrar entrada"}
+                {turnoAberto ? "Registrar saída da loja" : "Registrar entrada da loja"}
               </div>
               <div className="text-xs opacity-90">
                 {turnoAberto ? `Turno aberto desde ${horaEntrada}` : "Fotografe-se na chegada à loja"}
