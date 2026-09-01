@@ -39,7 +39,6 @@ export default function HomeClient({
           </button>
         </div>
 
-
         <Link
           href="/venda"
           className="w-full rounded-xl p-5 mb-4 flex items-center gap-4 bg-[#1E46E6] text-white"
@@ -53,7 +52,7 @@ export default function HomeClient({
 
         <Link
           href="/estoque"
-          className="w-full rounded-xl p-5 flex items-center gap-4 border-2 border-[#1E46E6] bg-white text-[#0B1440]"
+          className="w-full rounded-xl p-5 mb-4 flex items-center gap-4 border-2 border-[#1E46E6] bg-white text-[#0B1440]"
         >
           <PackageSearch size={28} className="text-[#1E46E6]" />
           <div>
@@ -62,16 +61,16 @@ export default function HomeClient({
           </div>
         </Link>
 
-                {ehPromotor && (
+        {ehPromotor && (
           <Link
             href="/ponto"
-            className="w-full rounded-xl p-5 mb-4 flex items-center gap-4 text-white"
+            className="w-full rounded-xl p-5 flex items-center gap-4 text-white"
             style={{ background: turnoAberto ? "#1F8A70" : "#E8601C" }}
           >
             {turnoAberto ? <Clock size={28} /> : <LogIn size={28} />}
             <div>
               <div className="font-bold text-base">
-                {turnoAberto ? "Registrar saída da loja" : "Registrar entrada da loja"}
+                {turnoAberto ? "Registrar saída" : "Registrar entrada"}
               </div>
               <div className="text-xs opacity-90">
                 {turnoAberto ? `Turno aberto desde ${horaEntrada}` : "Fotografe-se na chegada à loja"}
@@ -79,7 +78,6 @@ export default function HomeClient({
             </div>
           </Link>
         )}
-
       </div>
     </div>
   );
