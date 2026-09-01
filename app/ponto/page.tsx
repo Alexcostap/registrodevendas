@@ -67,6 +67,8 @@ export default function PontoPage() {
   const [lojaId, setLojaId] = useState<number | null>(null);
   const [foto, setFoto] = useState<File | null>(null);
   const [previewFoto, setPreviewFoto] = useState<string | null>(null);
+  const [fotoSaida, setFotoSaida] = useState<File | null>(null);
+  const [previewFotoSaida, setPreviewFotoSaida] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState("");
   const [sucesso, setSucesso] = useState<"entrada" | "saida" | null>(null);
@@ -87,6 +89,13 @@ export default function PontoPage() {
     if (!file) return;
     setFoto(file);
     setPreviewFoto(URL.createObjectURL(file));
+  }
+
+  function handleFotoSaida(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFotoSaida(file);
+    setPreviewFotoSaida(URL.createObjectURL(file));
   }
 
   async function handleRegistrarEntrada() {
@@ -120,13 +129,26 @@ export default function PontoPage() {
   }
 
   async function handleRegistrarSaida() {
-    if (!turnoAberto) return;
+    if (!turnoAberto || !promotorId) return;
     setErroEnvio("");
+    if (!fotoSaida) {
+      setErroEnvio("Tire a foto antes de registrar a saída.");
+      return;
+    }
     setEnviando(true);
+
+    const caminho = `${promotorId}/${Date.now()}-saida-${fotoSaida.name}`;
+    const { error: erroUpload } = await supabase.storage.from("fotos-ponto").upload(caminho, fotoSaida);
+    if (erroUpload) {
+      setEnviando(false);
+      setErroEnvio("Não foi possível enviar a foto. Tente novamente.");
+      return;
+    }
+
     const { error } = await supabase
       .schema("JOVI")
       .from("Ponto")
-      .update({ data_hora_saida: new Date().toISOString() })
+      .update({ data_hora_saida: new Date().toISOString(), foto_saida_url: caminho })
       .eq("id", turnoAberto.id);
     setEnviando(false);
 
@@ -186,19 +208,38 @@ export default function PontoPage() {
     );
   }
 
-  // ---- turno já aberto: só pede confirmação de saída ----
+  // ---- turno já aberto: pede foto e confirma a saída ----
   if (turnoAberto) {
+    const podeRegistrarSaida = !!fotoSaida;
     return (
       <Shell>
         <Header title="Registro de ponto" backHref="/" />
-        <div className="rounded-lg border border-[#DCE1F5] bg-white p-5 text-center">
-          <Clock size={28} className="mx-auto mb-3 text-[#1F8A70]" />
-          <p className="text-sm text-[#6B7699] mb-1">Turno aberto desde</p>
-          <p className="fonte-titulo text-lg font-bold text-[#0B1440] mb-5">
-            {new Date(turnoAberto.data_hora_entrada).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-          </p>
-          {erroEnvio && <div className="flex items-start gap-2 text-xs rounded-md px-3 py-2 mb-3 bg-red-50 text-red-700 text-left"><AlertCircle size={14} className="shrink-0 mt-0.5" />{erroEnvio}</div>}
-          <button onClick={handleRegistrarSaida} disabled={enviando} className="w-full rounded-md py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 bg-[#1E46E6]">
+        <div className="rounded-lg border border-[#DCE1F5] bg-white p-5">
+          <div className="text-center mb-5">
+            <Clock size={28} className="mx-auto mb-3 text-[#1F8A70]" />
+            <p className="text-sm text-[#6B7699] mb-1">Turno aberto desde</p>
+            <p className="fonte-titulo text-lg font-bold text-[#0B1440]">
+              {new Date(turnoAberto.data_hora_entrada).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+            </p>
+          </div>
+
+          <label className="block text-xs font-semibold mb-2 text-[#0B1440]">Foto na saída</label>
+          <label className="flex flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed py-8 px-2 cursor-pointer text-center mb-4" style={{ borderColor: previewFotoSaida ? "#1F8A70" : "#DCE1F5" }}>
+            {previewFotoSaida ? (
+              <img src={previewFotoSaida} alt="prévia" className="h-24 rounded-md object-cover" />
+            ) : (
+              <>
+                <Camera size={22} className="text-[#6B7699]" />
+                <span className="text-sm font-medium text-[#0B1440]">Tirar foto agora</span>
+                <span className="text-[10px] text-[#6B7699]">a câmera abre direto — sem escolher da galeria</span>
+              </>
+            )}
+            <input type="file" accept="image/*" capture="user" className="hidden" onChange={handleFotoSaida} />
+          </label>
+
+          {erroEnvio && <div className="flex items-start gap-2 text-xs rounded-md px-3 py-2 mb-3 bg-red-50 text-red-700"><AlertCircle size={14} className="shrink-0 mt-0.5" />{erroEnvio}</div>}
+
+          <button disabled={!podeRegistrarSaida || enviando} onClick={handleRegistrarSaida} className="w-full rounded-md py-3 text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ background: podeRegistrarSaida ? "#1E46E6" : "#DCE1F5" }}>
             {enviando && <Loader2 size={16} className="animate-spin" />}
             Registrar saída agora
           </button>
