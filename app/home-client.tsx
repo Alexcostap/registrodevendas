@@ -1,16 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { PlusCircle, PackageSearch, LogOut } from "lucide-react";
+import { PlusCircle, PackageSearch, LogOut, Clock, LogIn } from "lucide-react";
 import { createClient } from "../lib/supabase/client";
 
-export default function HomeClient({ nome }: { nome: string }) {
+type TurnoAberto = { id: number; data_hora_entrada: string; loja_id: number } | null;
+
+export default function HomeClient({
+  nome,
+  ehPromotor,
+  turnoAberto,
+}: {
+  nome: string;
+  ehPromotor: boolean;
+  turnoAberto: TurnoAberto;
+}) {
   const supabase = createClient();
 
   async function handleLogout() {
     await supabase.auth.signOut();
     window.location.href = "/login";
   }
+
+  const horaEntrada = turnoAberto
+    ? new Date(turnoAberto.data_hora_entrada).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+    : null;
 
   return (
     <div className="min-h-screen w-full flex items-start justify-center p-6 bg-[#F4F6FC]">
@@ -24,6 +38,24 @@ export default function HomeClient({ nome }: { nome: string }) {
             <LogOut size={18} className="text-[#6B7699]" />
           </button>
         </div>
+
+        {ehPromotor && (
+          <Link
+            href="/ponto"
+            className="w-full rounded-xl p-5 mb-4 flex items-center gap-4 text-white"
+            style={{ background: turnoAberto ? "#1F8A70" : "#E8601C" }}
+          >
+            {turnoAberto ? <Clock size={28} /> : <LogIn size={28} />}
+            <div>
+              <div className="font-bold text-base">
+                {turnoAberto ? "Registrar saída" : "Registrar entrada"}
+              </div>
+              <div className="text-xs opacity-90">
+                {turnoAberto ? `Turno aberto desde ${horaEntrada}` : "Fotografe-se na chegada à loja"}
+              </div>
+            </div>
+          </Link>
+        )}
 
         <Link
           href="/venda"

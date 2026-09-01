@@ -20,11 +20,12 @@ export default async function HomePage() {
   const { data: promotor } = await supabase
     .schema("JOVI")
     .from("Promotores")
-    .select("NOME_COMPLETO")
+    .select("id, NOME_COMPLETO")
     .eq("auth_user_id", user!.id)
     .maybeSingle();
 
   let nomeCompleto = promotor?.NOME_COMPLETO;
+  const ehPromotor = !!promotor;
 
   if (!nomeCompleto) {
     const { data: supervisor } = await supabase
@@ -38,5 +39,19 @@ export default async function HomePage() {
 
   const nomeExibido = nomeCompleto ? primeiroNomeCapitalizado(nomeCompleto) : "Promotor";
 
-  return <HomeClient nome={nomeExibido} />;
+  // Só promotores registram ponto — e só checamos se tem turno aberto
+  // quando a pessoa É promotor, pra não gastar consulta à toa.
+  let turnoAberto = null;
+  if (promotor) {
+    const { data } = await supabase
+      .schema("JOVI")
+      .from("Ponto")
+      .select("id, data_hora_entrada, loja_id")
+      .eq("promotor_id", promotor.id)
+      .is("data_hora_saida", null)
+      .maybeSingle();
+    turnoAberto = data;
+  }
+
+  return <HomeClient nome={nomeExibido} ehPromotor={ehPromotor} turnoAberto={turnoAberto} />;
 }
