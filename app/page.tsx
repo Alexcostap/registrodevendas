@@ -26,6 +26,7 @@ export default async function HomePage() {
 
   let nomeCompleto = promotor?.NOME_COMPLETO;
   const ehPromotor = !!promotor;
+  let ehSupervisor = false;
 
   if (!nomeCompleto) {
     const { data: supervisor } = await supabase
@@ -35,6 +36,7 @@ export default async function HomePage() {
       .eq("auth_user_id", user!.id)
       .maybeSingle();
     nomeCompleto = supervisor?.NOME_COMPLETO;
+    ehSupervisor = !!supervisor;
   }
 
   const nomeExibido = nomeCompleto ? primeiroNomeCapitalizado(nomeCompleto) : "Promotor";
@@ -53,5 +55,12 @@ export default async function HomePage() {
     turnoAberto = data;
   }
 
-  return <HomeClient nome={nomeExibido} ehPromotor={ehPromotor} turnoAberto={turnoAberto} />;
+  return (
+    <HomeClient
+      nome={nomeExibido}
+      ehPromotor={ehPromotor}
+      ehSupervisor={ehSupervisor}
+      turnoAberto={turnoAberto}
+    />
+  );
 }

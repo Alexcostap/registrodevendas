@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { PlusCircle, PackageSearch, LogOut, Clock, LogIn } from "lucide-react";
+import { PlusCircle, PackageSearch, LogOut, Clock, LogIn, CalendarClock } from "lucide-react";
 import { createClient } from "../lib/supabase/client";
 
 type TurnoAberto = { id: number; data_hora_entrada: string; loja_id: number } | null;
@@ -9,10 +9,12 @@ type TurnoAberto = { id: number; data_hora_entrada: string; loja_id: number } | 
 export default function HomeClient({
   nome,
   ehPromotor,
+  ehSupervisor,
   turnoAberto,
 }: {
   nome: string;
   ehPromotor: boolean;
+  ehSupervisor: boolean;
   turnoAberto: TurnoAberto;
 }) {
   const supabase = createClient();
@@ -75,6 +77,19 @@ export default function HomeClient({
               <div className="text-xs opacity-90">
                 {turnoAberto ? `Turno aberto desde ${horaEntrada}` : "Fotografe-se na chegada à loja"}
               </div>
+            </div>
+          </Link>
+        )}
+
+        {ehSupervisor && (
+          <Link
+            href="/escala"
+            className="w-full rounded-xl p-5 flex items-center gap-4 border-2 border-[#1E46E6] bg-white text-[#0B1440]"
+          >
+            <CalendarClock size={28} className="text-[#1E46E6]" />
+            <div>
+              <div className="font-bold text-base">Escala da equipe</div>
+              <div className="text-xs text-[#6B7699]">Dia, horário e loja de cada promotor</div>
             </div>
           </Link>
         )}
