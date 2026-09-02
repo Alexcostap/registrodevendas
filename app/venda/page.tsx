@@ -353,10 +353,10 @@ export default function VendaPage() {
         <div className="px-5">
           <StepShell number={1} title="Localização" done={step1Done} open={openStep === 1} onToggle={() => setOpenStep(openStep === 1 ? 0 : 1)} summary={step1Done ? `${rede} · ${cidade} — ${lojaNome}` : ""}>
             <div className="space-y-3">
-              <FixedSelect listId="lista-redes" value={rede} onChange={(v) => { setRede(v); setUf(""); setCidade(""); selecionarLoja(""); }} options={redesDisponiveis} placeholder="Rede" icon={Building2} />
-              {rede && <FixedSelect listId="lista-ufs" value={uf} onChange={(v) => { setUf(v); setCidade(""); selecionarLoja(""); }} options={ufsDisponiveis} placeholder="UF" icon={MapPin} />}
-              {rede && uf && <FixedSelect listId="lista-cidades" value={cidade} onChange={(v) => { setCidade(v); selecionarLoja(""); }} options={cidadesDisponiveis} placeholder="Cidade" icon={MapPin} />}
-              {rede && uf && cidade && <FixedSelect listId="lista-lojas" value={lojaNome} onChange={selecionarLoja} options={lojasDisponiveis} placeholder="Loja" icon={Store} />}
+              <FixedSelect value={rede} onChange={(v) => { setRede(v); setUf(""); setCidade(""); selecionarLoja(""); }} options={redesDisponiveis} placeholder="Rede" icon={Building2} />
+              {rede && <FixedSelect value={uf} onChange={(v) => { setUf(v); setCidade(""); selecionarLoja(""); }} options={ufsDisponiveis} placeholder="UF" icon={MapPin} />}
+              {rede && uf && <FixedSelect value={cidade} onChange={(v) => { setCidade(v); selecionarLoja(""); }} options={cidadesDisponiveis} placeholder="Cidade" icon={MapPin} />}
+              {rede && uf && cidade && <FixedSelect value={lojaNome} onChange={selecionarLoja} options={lojasDisponiveis} placeholder="Loja" icon={Store} />}
             </div>
           </StepShell>
 
