@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Store, MapPin, Building2, User, Loader2, AlertCircle, Trash2, Plus } from "lucide-react";
 import { createClient } from "../../lib/supabase/client";
-import { Shell, Header, TypeableSelect, FixedSelect } from "../_components/ui";
+import { Shell, Header, FixedSelect } from "../_components/ui";
 
 type LojaRow = { id: number; CUSTOMER: string; UF: string; CIDADE: string; LOJA: string };
 type PromotorRow = { id: number; NOME_COMPLETO: string };
@@ -301,10 +301,10 @@ export default function EscalaPage() {
           required
         />
 
-        <TypeableSelect listId="lista-redes-escala" value={rede} onChange={(v) => { setRede(v); setUf(""); setCidade(""); selecionarLoja(""); }} options={redesDisponiveis} placeholder="Rede" icon={Building2} />
-        {rede && <TypeableSelect listId="lista-ufs-escala" value={uf} onChange={(v) => { setUf(v); setCidade(""); selecionarLoja(""); }} options={ufsDisponiveis} placeholder="UF" icon={MapPin} />}
-        {rede && uf && <TypeableSelect listId="lista-cidades-escala" value={cidade} onChange={(v) => { setCidade(v); selecionarLoja(""); }} options={cidadesDisponiveis} placeholder="Cidade" icon={MapPin} />}
-        {rede && uf && cidade && <TypeableSelect listId="lista-lojas-escala" value={lojaNome} onChange={selecionarLoja} options={lojasDisponiveis} placeholder="Loja" icon={Store} />}
+        <FixedSelect value={rede} onChange={(v) => { setRede(v); setUf(""); setCidade(""); selecionarLoja(""); }} options={redesDisponiveis} placeholder="Rede" icon={Building2} required />
+        {rede && <FixedSelect value={uf} onChange={(v) => { setUf(v); setCidade(""); selecionarLoja(""); }} options={ufsDisponiveis} placeholder="UF" icon={MapPin} required />}
+        {rede && uf && <FixedSelect value={cidade} onChange={(v) => { setCidade(v); selecionarLoja(""); }} options={cidadesDisponiveis} placeholder="Cidade" icon={MapPin} required />}
+        {rede && uf && cidade && <FixedSelect value={lojaNome} onChange={selecionarLoja} options={lojasDisponiveis} placeholder="Loja" icon={Store} required />}
 
         {modo === "pontual" ? (
           <div>
