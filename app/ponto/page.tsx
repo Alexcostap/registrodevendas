@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Store, MapPin, Building2, Camera, Loader2, AlertCircle, Check, Clock } from "lucide-react";
 import { createClient } from "../../lib/supabase/client";
-import { Shell, Header, TypeableSelect } from "../_components/ui";
+import { Shell, Header, TypeableSelect, FixedSelect } from "../_components/ui";
 
 type LojaRow = { id: number; CUSTOMER: string; UF: string; CIDADE: string; LOJA: string };
 type TurnoAberto = { id: number; data_hora_entrada: string; loja_id: number };
