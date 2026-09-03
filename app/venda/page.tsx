@@ -158,6 +158,12 @@ export default function VendaPage() {
     setOcrErrorCaixa("");
   }
 
+  function dataBRparaISO(dataBR: string): string | null {
+    const digitos = dataBR.replace(/\D/g, "");
+    if (digitos.length !== 8) return null;
+    return `${digitos.slice(4, 8)}-${digitos.slice(2, 4)}-${digitos.slice(0, 2)}`;
+  }
+
   async function processarNota(file: File) {
     setOcrErrorNota("");
     try {
@@ -166,7 +172,10 @@ export default function VendaPage() {
         `Esta é uma nota fiscal de venda de aparelho celular. Extraia os dados e responda APENAS com um objeto JSON válido (sem markdown, sem texto extra), no formato: {"numero_nota": string ou null, "data_venda": string "DD/MM/AAAA" ou null, "valor": string apenas números (ex: 2500.00) ou null}. Se não conseguir ler algum campo com confiança, use null nele.`
       );
       if (parsed.numero_nota) setNumeroNota(String(parsed.numero_nota));
-      if (parsed.data_venda) setDataVenda(String(parsed.data_venda));
+      if (parsed.data_venda) {
+        const iso = dataBRparaISO(String(parsed.data_venda));
+        if (iso) setDataVenda(iso);
+      }
       if (parsed.valor) setValor(String(parsed.valor));
       setDadosOcrNota(parsed);
     } catch (e) {
@@ -216,12 +225,6 @@ export default function VendaPage() {
   const [erroEnvio, setErroEnvio] = useState("");
   const [sucesso, setSucesso] = useState(false);
 
-  function dataParaISO(dataBR: string): string | null {
-    const digitos = dataBR.replace(/\D/g, "");
-    if (digitos.length !== 8) return null;
-    return `${digitos.slice(4, 8)}-${digitos.slice(2, 4)}-${digitos.slice(0, 2)}`;
-  }
-
   async function uploadComprovante(file: File, prefixo: string): Promise<string | null> {
     const caminho = `${lojaId}/${Date.now()}-${prefixo}-${file.name}`;
     const { error } = await supabase.storage.from("comprovantes-venda").upload(caminho, file);
@@ -238,7 +241,7 @@ export default function VendaPage() {
       setErroEnvio("Só promotores podem registrar vendas.");
       return;
     }
-    const dataISO = dataParaISO(dataVenda);
+    const dataISO = dataVenda;
     if (!dataISO) {
       setErroEnvio("Data da venda inválida.");
       return;
@@ -411,7 +414,15 @@ export default function VendaPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <TextField value={valor} onChange={setValor} placeholder="Valor (R$)" mono required />
-                    <TextField value={dataVenda} onChange={setDataVenda} placeholder="Data (DD/MM/AAAA)" mono required />
+                    <div>
+                      <label className="block text-xs font-semibold mb-1.5 text-[#0B1440]">Data da venda *</label>
+                      <input
+                        type="date"
+                        value={dataVenda}
+                        onChange={(e) => setDataVenda(e.target.value)}
+                        className="w-full rounded-md border border-[#DCE1F5] bg-white py-2.5 px-3 text-sm outline-none text-[#0B1440]"
+                      />
+                    </div>
                   </div>
                   <button onClick={() => { setManualMode(false); setPreviewNota(null); setPreviewCaixa(null); setFileNota(null); setFileCaixa(null); }} className="text-xs text-[#6B7699]">
                     ← usar foto / OCR em vez disso
