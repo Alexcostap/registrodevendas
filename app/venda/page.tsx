@@ -419,6 +419,7 @@ export default function VendaPage() {
                       <input
                         type="date"
                         value={dataVenda}
+                        max={new Date().toISOString().split("T")[0]}
                         onChange={(e) => setDataVenda(e.target.value)}
                         className="w-full rounded-md border border-[#DCE1F5] bg-white py-2.5 px-3 text-sm outline-none text-[#0B1440]"
                       />
