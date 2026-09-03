@@ -10,7 +10,7 @@ import { Shell, Header, FixedSelect, TypeableSelect, TextField, TextArea, StepSh
 
 type LojaRow = { id: number; CUSTOMER: string; UF: string; CIDADE: string; LOJA: string };
 type ModeloRow = { id: number; MODELO: string };
-type CorRow = { id: number; COR: string };
+type CorRow = { id: number; COR: string; COR_BR: string };
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -41,7 +41,7 @@ export default function VendaPage() {
         const [lojasRes, modelosRes, coresRes, promotorRes] = await Promise.all([
           supabase.schema("JOVI").from("Lojas").select('id:ID, CUSTOMER, UF, CIDADE, LOJA'),
           supabase.schema("JOVI").from("Modelos").select("id, MODELO").eq("EM_VENDA", true),
-          supabase.schema("JOVI").from("Cores").select("id, COR"),
+          supabase.schema("JOVI").from("Cores").select("id, COR, COR_BR"),
           uid
             ? supabase.schema("JOVI").from("Promotores").select("id").eq("auth_user_id", uid).maybeSingle()
             : Promise.resolve({ data: null }),
@@ -188,13 +188,14 @@ export default function VendaPage() {
     try {
       const parsed = await chamarOcr(
         file,
-        `Esta é uma foto da caixa/embalagem de um aparelho celular. Extraia os dados e responda APENAS com um objeto JSON válido (sem markdown, sem texto extra), no formato: {"produto": string ou null (nome curto no canto superior esquerdo da caixa, JUNTO com RAM e ROM entre parênteses, formato "Modelo(RAM+ROMG)", ex: "Y21(4+256G)"), "cor": string ou null, "imei1": string ou null, "imei2": string ou null}. Se não conseguir ler algum campo com confiança, use null nele.`
+        `Esta é uma foto da caixa/embalagem de um aparelho celular. Extraia os dados e responda APENAS com um objeto JSON válido (sem markdown, sem texto extra), no formato: {"produto": string ou null (nome curto no canto superior esquerdo da caixa, JUNTO com RAM e ROM entre parênteses, formato "Modelo(RAM+ROMG)", ex: "Y21(4+256G)"), "cor": string ou null (nome da cor em português, ex: "Preto", "Azul", "Dourado" — traduza se estiver em outro idioma na embalagem), "imei1": string ou null, "imei2": string ou null}. Se não conseguir ler algum campo com confiança, use null nele.`
       );
       if (parsed.produto) aplicarModeloPorNome(String(parsed.produto));
       if (parsed.cor) {
-        const matchCor = cores.find((c) => c.COR.toLowerCase() === String(parsed.cor).toLowerCase());
+        const corTexto = String(parsed.cor).toLowerCase();
+        const matchCor = cores.find((c) => c.COR.toLowerCase() === corTexto || c.COR_BR.toLowerCase() === corTexto);
         if (matchCor) {
-          setCorNome(matchCor.COR);
+          setCorNome(matchCor.COR_BR);
           setCorId(matchCor.id);
         }
       }
@@ -405,11 +406,11 @@ export default function VendaPage() {
                   )}
                   <FixedSelect value={aparelhoNome} onChange={(v) => { setAparelhoNome(v); setAparelhoId(modelos.find((m) => m.MODELO === v)?.id ?? null); }} options={modelos.map((m) => m.MODELO)} placeholder="Produto (Modelo+RAM+ROM)" icon={Smartphone} required />
                   <div className="grid grid-cols-2 gap-3">
-                    <FixedSelect value={corNome} onChange={(v) => { setCorNome(v); setCorId(cores.find((c) => c.COR === v)?.id ?? null); }} options={cores.map((c) => c.COR)} placeholder="Cor" icon={Palette} required />
-                    <TextField value={imei} onChange={(v) => setImei(v.replace(/\D/g, "").slice(0, 15))} placeholder="IMEI 1" mono required />
+                    <FixedSelect value={corNome} onChange={(v) => { setCorNome(v); setCorId(cores.find((c) => c.COR_BR === v)?.id ?? null); }} options={cores.map((c) => c.COR_BR)} placeholder="Cor" icon={Palette} required />
+                    <TextField value={imei} onChange={(v) => setImei(v.replace(/\D/g, "").slice(0, 15))} placeholder="IMEI 1" mono required/>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <TextField value={imei2} onChange={(v) => setImei2(v.replace(/\D/g, "").slice(0, 15))} placeholder="IMEI 2 (opcional)" mono />
+                    <TextField value={imei2} onChange={(v) => setImei2(v.replace(/\D/g, "").slice(0, 15))} placeholder="IMEI 2 (opcional)" mono/>
                     <TextField value={numeroNota} onChange={setNumeroNota} placeholder="Número da nota" mono required/>
                   </div>
                   <div className="grid grid-cols-2 gap-3">

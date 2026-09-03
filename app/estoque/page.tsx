@@ -8,7 +8,7 @@ import { Shell, Header, TypeableSelect, FixedSelect } from "../_components/ui";
 
 type LojaRow = { id: number; CUSTOMER: string; UF: string; CIDADE: string; LOJA: string };
 type ModeloRow = { id: number; MODELO: string };
-type CorRow = { id: number; COR: string };
+type CorRow = { id: number; COR: string; COR_BR: string };
 
 type ItemEstoque = {
   modeloNome: string;
@@ -40,7 +40,7 @@ function EstoqueConteudo() {
         const [lojasRes, modelosRes, coresRes] = await Promise.all([
           supabase.schema("JOVI").from("Lojas").select('id:ID, CUSTOMER, UF, CIDADE, LOJA'),
           supabase.schema("JOVI").from("Modelos").select("id, MODELO").eq("EM_VENDA", true),
-          supabase.schema("JOVI").from("Cores").select("id, COR"),
+          supabase.schema("JOVI").from("Cores").select("id, COR, COR_BR"),
         ]);
         setLojas((lojasRes.data as any) || []);
         setModelos((modelosRes.data as any) || []);
@@ -119,7 +119,7 @@ function EstoqueConteudo() {
   }
 
   function handleSelecionarCor(index: number, nome: string) {
-    const cor = cores.find((c) => c.COR === nome);
+    const cor = cores.find((c) => c.COR_BR === nome);
     const corId = cor?.id ?? null;
     atualizarItem(index, { corNome: nome, corId });
     const modeloIdAtual = itens[index].modeloId;
@@ -237,7 +237,7 @@ function EstoqueConteudo() {
               </div>
 
               <FixedSelect value={item.modeloNome} onChange={(v) => handleSelecionarModelo(index, v)} options={modelos.map((m) => m.MODELO)} placeholder="Aparelho" icon={Smartphone} />
-              <FixedSelect value={item.corNome} onChange={(v) => handleSelecionarCor(index, v)} options={cores.map((c) => c.COR)} placeholder="Cor" icon={Palette} />
+              <FixedSelect value={item.corNome} onChange={(v) => handleSelecionarCor(index, v)} options={cores.map((c) => c.COR_BR)} placeholder="Cor" icon={Palette} />
 
               <div>
                 <label className="block text-xs font-semibold mb-2 text-[#0B1440]">Quantidade em estoque</label>
