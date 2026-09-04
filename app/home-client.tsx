@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { PlusCircle, PackageSearch, LogOut, Clock, LogIn, CalendarClock } from "lucide-react";
+import { PlusCircle, PackageSearch, LogOut, Clock, LogIn, CalendarClock, Plane } from "lucide-react";
 import { createClient } from "../lib/supabase/client";
 
 type TurnoAberto = { id: number; data_hora_entrada: string; loja_id: number } | null;
@@ -86,12 +86,25 @@ export default function HomeClient({
         {(ehSupervisor || ehGestor) && (
           <Link
             href="/escala"
-            className="w-full rounded-xl p-5 flex items-center gap-4 border-2 border-[#1E46E6] bg-white text-[#0B1440]"
+            className="w-full rounded-xl p-5 mb-4 flex items-center gap-4 border-2 border-[#1E46E6] bg-white text-[#0B1440]"
           >
             <CalendarClock size={28} className="text-[#1E46E6]" />
             <div>
               <div className="font-bold text-base">{ehGestor ? "Escala (todos os promotores)" : "Escala da equipe"}</div>
               <div className="text-xs text-[#6B7699]">Dia, horário e loja de cada promotor</div>
+            </div>
+          </Link>
+        )}
+
+        {(ehSupervisor || ehGestor) && (
+          <Link
+            href="/ferias"
+            className="w-full rounded-xl p-5 flex items-center gap-4 border-2 border-[#1E46E6] bg-white text-[#0B1440]"
+          >
+            <Plane size={28} className="text-[#1E46E6]" />
+            <div>
+              <div className="font-bold text-base">{ehGestor ? "Férias (todos os promotores)" : "Férias da equipe"}</div>
+              <div className="text-xs text-[#6B7699]">Quem está e quem entra de férias</div>
             </div>
           </Link>
         )}
