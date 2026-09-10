@@ -64,7 +64,10 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-// Aplica a todas as rotas, exceto assets estáticos
+// Aplica a todas as rotas, exceto assets estáticos (qualquer arquivo
+// com extensão de imagem/manifest/etc — não só os 3 casos fixos de antes,
+// que deixavam passar coisas como logo-jovi.png, icon.png e o manifest
+// e o middleware acabava redirecionando ESSES arquivos pro /login).
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|webmanifest|txt|xml|json)$).*)"],
 };
