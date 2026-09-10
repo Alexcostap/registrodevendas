@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Store, MapPin, Building2, Minus, Plus, Check, Loader2, AlertCircle, PlusCircle } from "lucide-react";
 import { createClient } from "../../lib/supabase/client";
-import { Shell, Header, FixedSelect, TextField } from "../_components/ui";
+import { Shell, Header, FixedSelect } from "../_components/ui";
 
 type LojaRow = { id: number; CUSTOMER: string; UF: string; CIDADE: string; LOJA: string };
 
@@ -53,9 +53,13 @@ export default function OutrasMarcasPage() {
   const [lojaId, setLojaId] = useState<number | null>(null);
   const [marca, setMarca] = useState("");
   const [qtd, setQtd] = useState(1);
+  const [periodoInicio, setPeriodoInicio] = useState("");
+  const [periodoFim, setPeriodoFim] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState("");
   const [sucesso, setSucesso] = useState(false);
+
+  const hoje = new Date().toISOString().slice(0, 10);
 
   const redesDisponiveis = [...new Set(lojas.map((l) => l.CUSTOMER))];
   const ufsDisponiveis = rede ? [...new Set(lojas.filter((l) => l.CUSTOMER === rede).map((l) => l.UF))] : [];
@@ -68,7 +72,7 @@ export default function OutrasMarcasPage() {
     setLojaId(encontrada ? encontrada.id : null);
   }
 
-  const podeSalvar = !!lojaId && !!marca.trim() && qtd > 0;
+  const podeSalvar = !!lojaId && !!marca.trim() && qtd > 0 && !!periodoInicio && !!periodoFim && periodoFim >= periodoInicio;
 
   async function handleRegistrar() {
     setErroEnvio("");
@@ -79,6 +83,8 @@ export default function OutrasMarcasPage() {
       loja_id: lojaId,
       marca: marca.trim(),
       quantidade: qtd,
+      periodo_inicio: periodoInicio,
+      periodo_fim: periodoFim,
     });
     setEnviando(false);
     if (error) {
@@ -90,7 +96,7 @@ export default function OutrasMarcasPage() {
 
   function resetar() {
     setRede(""); setUf(""); setCidade(""); setLojaNome(""); setLojaId(null);
-    setMarca(""); setQtd(1); setSucesso(false);
+    setMarca(""); setQtd(1); setPeriodoInicio(""); setPeriodoFim(""); setSucesso(false);
   }
 
   if (carregando) {
@@ -121,6 +127,7 @@ export default function OutrasMarcasPage() {
           </div>
           <h2 className="fonte-titulo text-lg font-bold text-[#0B1440]">Venda registrada</h2>
           <p className="text-sm text-[#6B7699]">{marca} · {qtd} unid. · {lojaNome}</p>
+          <p className="text-xs text-[#6B7699]">Período: {periodoInicio.split("-").reverse().join("/")} até {periodoFim.split("-").reverse().join("/")}</p>
         </div>
         <button onClick={resetar} className="w-full rounded-xl p-4 mb-3 flex items-center gap-3 border-2 border-[#1E46E6] bg-white text-[#0B1440]">
           <PlusCircle size={22} className="text-[#1E46E6]" />
@@ -145,7 +152,21 @@ export default function OutrasMarcasPage() {
           </div>
         </div>
 
-        <TextField value={marca} onChange={setMarca} placeholder="Marca vendida (ex: Samsung, Motorola)" required />
+        <FixedSelect value={marca} onChange={setMarca} options={["Apple", "Motorola", "Oppo", "SamSung"]} placeholder="Marca vendida (ex: Apple, Motorola, Oppo, SamSung)" required />
+
+        <div>
+          <label className="block text-xs font-semibold mb-2 text-[#0B1440]">Período de apuração</label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] text-[#6B7699] mb-1">De *</label>
+              <input type="date" value={periodoInicio} max={hoje} onChange={(e) => { setPeriodoInicio(e.target.value); if (periodoFim && e.target.value > periodoFim) setPeriodoFim(""); }} className="w-full rounded-md border border-[#DCE1F5] bg-white py-2.5 px-3 text-sm outline-none text-[#0B1440]" />
+            </div>
+            <div>
+              <label className="block text-[10px] text-[#6B7699] mb-1">Até *</label>
+              <input type="date" value={periodoFim} min={periodoInicio || undefined} max={hoje} onChange={(e) => setPeriodoFim(e.target.value)} className="w-full rounded-md border border-[#DCE1F5] bg-white py-2.5 px-3 text-sm outline-none text-[#0B1440]" />
+            </div>
+          </div>
+        </div>
 
         <div>
           <label className="block text-xs font-semibold mb-2 text-[#0B1440]">Quantidade vendida</label>

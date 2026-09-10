@@ -21,6 +21,14 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+// Primeiro dia do mês anterior ao atual — é o limite mais antigo que
+// a venda pode ter (mês atual + mês anterior, nunca antes disso).
+function calcularDataMinimaVenda(): string {
+  const hoje = new Date();
+  const primeiroDiaMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+  return primeiroDiaMesAnterior.toISOString().slice(0, 10);
+}
+
 export default function VendaPage() {
   const supabase = createClient();
 
@@ -174,7 +182,10 @@ export default function VendaPage() {
       if (parsed.numero_nota) setNumeroNota(String(parsed.numero_nota));
       if (parsed.data_venda) {
         const iso = dataBRparaISO(String(parsed.data_venda));
-        if (iso) setDataVenda(iso);
+        const hojeISO = new Date().toISOString().slice(0, 10);
+        if (iso && iso >= calcularDataMinimaVenda() && iso <= hojeISO) {
+          setDataVenda(iso);
+        }
       }
       if (parsed.valor) setValor(String(parsed.valor));
       setDadosOcrNota(parsed);
@@ -420,6 +431,7 @@ export default function VendaPage() {
                       <input
                         type="date"
                         value={dataVenda}
+                        min={calcularDataMinimaVenda()}
                         max={new Date().toISOString().split("T")[0]}
                         onChange={(e) => setDataVenda(e.target.value)}
                         className="w-full rounded-md border border-[#DCE1F5] bg-white py-2.5 px-3 text-sm outline-none text-[#0B1440]"
