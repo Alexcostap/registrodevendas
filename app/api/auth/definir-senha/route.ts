@@ -11,8 +11,8 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null);
     const novaSenha = (body?.novaSenha || "").replace(/\D/g, "");
 
-    if (novaSenha.length < 4) {
-      return NextResponse.json({ error: "O PIN precisa ter pelo menos 4 números." }, { status: 400 });
+    if (novaSenha.length < 6) {
+      return NextResponse.json({ error: "O PIN precisa ter pelo menos 6 números." }, { status: 400 });
     }
 
     const supabase = createClient();

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { PlusCircle, PackageSearch, LogOut, Clock, LogIn, CalendarClock, Plane } from "lucide-react";
+import { PlusCircle, PackageSearch, LogOut, Clock, LogIn, CalendarClock, Plane, Tags } from "lucide-react";
 import { createClient } from "../lib/supabase/client";
 
 type TurnoAberto = { id: number; data_hora_entrada: string; loja_id: number } | null;
@@ -53,6 +53,19 @@ export default function HomeClient({
             <div className="text-xs opacity-80">Fotografe a nota e a caixa, registre em segundos</div>
           </div>
         </Link>
+
+        {ehPromotor && (
+          <Link
+            href="/outras-marcas"
+            className="w-full rounded-xl p-5 mb-4 flex items-center gap-4 border-2 border-[#1E46E6] bg-white text-[#0B1440]"
+          >
+            <Tags size={28} className="text-[#1E46E6]" />
+            <div>
+              <div className="font-bold text-base">Vendas de outras marcas</div>
+              <div className="text-xs text-[#6B7699]">Loja, marca e quantidade</div>
+            </div>
+          </Link>
+        )}
 
         <Link
           href="/estoque"

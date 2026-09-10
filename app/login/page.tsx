@@ -33,7 +33,7 @@ export default function LoginPage() {
     setError("");
     const cpfDigitos = somenteDigitos(cpf);
 
-    if (cpfDigitos.length !== 11 || pin.length < 4) {
+    if (cpfDigitos.length !== 11 || pin.length < 6) {
       setError("Preencha CPF completo e o PIN.");
       return;
     }
@@ -71,11 +71,9 @@ export default function LoginPage() {
         style={{ background: "linear-gradient(160deg, #0B1440 0%, #142B8A 45%, #1E46E6 100%)" }}
       >
         <div className="w-full max-w-sm">
-          <div className="flex items-center gap-2 mb-6 px-1">
-            <div className="w-8 h-8 rounded-md flex items-center justify-center bg-white">
-              <span className="font-bold text-[#1E46E6] text-sm">J</span>
-            </div>
-            <span className="text-[#DCE3FF] text-xs tracking-widest">JOVI · REGISTRO DE VENDAS</span>
+          <div className="flex justify-center mb-8">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-jovi.png" alt="JOVI" className="h-16 w-auto" />
           </div>
 
           <div className="rounded-xl p-7 bg-white shadow-xl">

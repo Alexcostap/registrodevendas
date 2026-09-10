@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Store, MapPin, Building2, Camera, Loader2, AlertCircle, Check, Clock } from "lucide-react";
+import { Store, MapPin, Building2, Camera, Loader2, AlertCircle, Check, Clock, MessageSquareWarning } from "lucide-react";
 import { createClient } from "../../lib/supabase/client";
 import { Shell, Header, TypeableSelect, FixedSelect } from "../_components/ui";
 
@@ -73,6 +73,12 @@ export default function PontoPage() {
   const [erroEnvio, setErroEnvio] = useState("");
   const [sucesso, setSucesso] = useState<"entrada" | "saida" | null>(null);
 
+  // ---- justificativa de saída não registrada no dia anterior ----
+  const [motivoJustificativa, setMotivoJustificativa] = useState("");
+  const [horaJustificativa, setHoraJustificativa] = useState("");
+  const [enviandoJustificativa, setEnviandoJustificativa] = useState(false);
+  const [erroJustificativa, setErroJustificativa] = useState("");
+
   const redesDisponiveis = [...new Set(lojas.map((l) => l.CUSTOMER))];
   const ufsDisponiveis = rede ? [...new Set(lojas.filter((l) => l.CUSTOMER === rede).map((l) => l.UF))] : [];
   const cidadesDisponiveis = rede && uf ? [...new Set(lojas.filter((l) => l.CUSTOMER === rede && l.UF === uf).map((l) => l.CIDADE))] : [];
@@ -96,6 +102,41 @@ export default function PontoPage() {
     if (!file) return;
     setFotoSaida(file);
     setPreviewFotoSaida(URL.createObjectURL(file));
+  }
+
+  function foiHoje(dataISO: string) {
+    return new Date(dataISO).toDateString() === new Date().toDateString();
+  }
+
+  async function handleJustificarSaida() {
+    if (!turnoAberto) return;
+    setErroJustificativa("");
+    if (!motivoJustificativa.trim() || !horaJustificativa) {
+      setErroJustificativa("Informe o motivo e o horário de saída.");
+      return;
+    }
+    setEnviandoJustificativa(true);
+
+    // a saída aconteceu no MESMO DIA da entrada (só não foi registrada
+    // na hora) — usamos a data da entrada + o horário informado agora
+    const dataEntrada = turnoAberto.data_hora_entrada.slice(0, 10);
+    const dataHoraSaida = new Date(`${dataEntrada}T${horaJustificativa}:00`).toISOString();
+
+    const { error } = await supabase
+      .schema("JOVI")
+      .from("Ponto")
+      .update({ data_hora_saida: dataHoraSaida, justificativa_saida: motivoJustificativa.trim() })
+      .eq("id", turnoAberto.id);
+    setEnviandoJustificativa(false);
+
+    if (error) {
+      setErroJustificativa("Não foi possível salvar a justificativa. Tente novamente.");
+      return;
+    }
+    // volta pro fluxo normal de registrar entrada
+    setTurnoAberto(null);
+    setMotivoJustificativa("");
+    setHoraJustificativa("");
   }
 
   async function handleRegistrarEntrada() {
@@ -204,6 +245,58 @@ export default function PontoPage() {
           <p className="text-sm text-[#6B7699]">{new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
         </div>
         <a href="/" className="block w-full text-center text-sm font-semibold py-2 text-[#1E46E6]">Ir para a Home</a>
+      </Shell>
+    );
+  }
+
+  // ---- turno aberto de um dia anterior: precisa justificar antes de continuar ----
+  if (turnoAberto && !foiHoje(turnoAberto.data_hora_entrada)) {
+    const lojaDoTurno = lojas.find((l) => l.id === turnoAberto.loja_id);
+    return (
+      <Shell>
+        <Header title="Justificar ponto" backHref="/" />
+        <div className="rounded-lg border p-5" style={{ borderColor: "#E8601C", background: "#FFF7F0" }}>
+          <div className="text-center mb-5">
+            <MessageSquareWarning size={28} className="mx-auto mb-3 text-[#E8601C]" />
+            <p className="text-sm font-semibold text-[#0B1440]">A saída do dia anterior não foi registrada</p>
+            <p className="text-xs text-[#6B7699] mt-1">
+              Entrada em {lojaDoTurno?.LOJA || "loja"} às {new Date(turnoAberto.data_hora_entrada).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold mb-1.5 text-[#0B1440]">Horário real de saída *</label>
+              <input
+                type="time"
+                value={horaJustificativa}
+                onChange={(e) => setHoraJustificativa(e.target.value)}
+                className="w-full rounded-md border border-[#DCE1F5] bg-white py-2.5 px-3 text-sm outline-none text-[#0B1440]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1.5 text-[#0B1440]">Motivo *</label>
+              <textarea
+                value={motivoJustificativa}
+                onChange={(e) => setMotivoJustificativa(e.target.value)}
+                placeholder="Por que a saída não foi registrada na hora?"
+                rows={3}
+                className="w-full rounded-md border border-[#DCE1F5] bg-white py-2.5 px-3 text-sm outline-none resize-none text-[#0B1440]"
+              />
+            </div>
+
+            {erroJustificativa && <div className="flex items-start gap-2 text-xs rounded-md px-3 py-2 bg-red-50 text-red-700"><AlertCircle size={14} className="shrink-0 mt-0.5" />{erroJustificativa}</div>}
+
+            <button
+              disabled={enviandoJustificativa}
+              onClick={handleJustificarSaida}
+              className="w-full rounded-md py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 bg-[#E8601C]"
+            >
+              {enviandoJustificativa && <Loader2 size={16} className="animate-spin" />}
+              Justificar e continuar
+            </button>
+          </div>
+        </div>
       </Shell>
     );
   }

@@ -12,8 +12,8 @@ export default function DefinirSenhaPage() {
 
   async function handleSubmit() {
     setError("");
-    if (pin.length < 4) {
-      setError("O PIN precisa ter pelo menos 4 números.");
+    if (pin.length < 6) {
+      setError("O PIN precisa ter pelo menos 6 números.");
       return;
     }
     if (pin !== confirmarPin) {
@@ -55,7 +55,7 @@ export default function DefinirSenhaPage() {
           </div>
           <h1 className="text-xl font-bold mb-1 text-[#0B1440]">Criar seu PIN</h1>
           <p className="text-sm mb-6 text-[#6B7699]">
-            Escolha um PIN de pelo menos 4 números. É ele que você vai usar pra entrar daqui pra frente, junto com seu CPF.
+            Escolha um PIN de pelo menos 6 números. É ele que você vai usar pra entrar daqui pra frente, junto com seu CPF.
           </p>
 
           <div className="space-y-3.5">
