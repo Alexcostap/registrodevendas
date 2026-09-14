@@ -103,6 +103,8 @@ export default function VendaPage() {
   const [corNome, setCorNome] = useState("");
   const [corId, setCorId] = useState<number | null>(null);
   const [imei, setImei] = useState("");
+  const [imeiValido, setImeiValido] = useState<boolean | null>(null); // null = ainda não verificado
+  const [imeiValidando, setImeiValidando] = useState(false);
   const [imei2, setImei2] = useState("");
   const [numeroNota, setNumeroNota] = useState("");
   const [dadosOcrNota, setDadosOcrNota] = useState<any>(null);
@@ -110,13 +112,39 @@ export default function VendaPage() {
   const [dataVenda, setDataVenda] = useState("");
   const [valor, setValor] = useState("");
 
+  // Assim que o IMEI 1 completa 15 dígitos (digitado ou vindo do OCR),
+  // confere se ele existe na base oficial de IMEIs.
+  useEffect(() => {
+    if (imei.length !== 15) {
+      setImeiValido(null);
+      setImeiValidando(false);
+      return;
+    }
+    let cancelado = false;
+    (async () => {
+      setImeiValidando(true);
+      const { data } = await supabase
+        .schema("JOVI")
+        .from("Base_IMEI")
+        .select("IMEI")
+        .eq("IMEI", imei)
+        .maybeSingle();
+      if (cancelado) return;
+      setImeiValidando(false);
+      setImeiValido(!!data);
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [imei]);
+
   // ---- passo 3: identificação do vendedor ----
   const [nomeVendedor, setNomeVendedor] = useState("");
   const [sobrenomeVendedor, setSobrenomeVendedor] = useState("");
   const [observacao, setObservacao] = useState("");
 
   const step1Done = !!lojaId;
-  const step2Done = !!aparelhoId && !!corId && !!imei && !!dataVenda && !!valor;
+  const step2Done = !!aparelhoId && !!corId && !!imei && imeiValido === true && !!dataVenda && !!valor;
   const step3Done = !!nomeVendedor && !!sobrenomeVendedor;
 
   function aplicarModeloPorNome(produtoTexto: string) {
@@ -251,6 +279,10 @@ export default function VendaPage() {
     setErroEnvio("");
     if (!promotorId) {
       setErroEnvio("Só promotores podem registrar vendas.");
+      return;
+    }
+    if (imeiValido !== true) {
+      setErroEnvio("IMEI inválido, inexistente na base.");
       return;
     }
     const dataISO = dataVenda;
@@ -416,12 +448,17 @@ export default function VendaPage() {
                     </div>
                   )}
                   <FixedSelect value={aparelhoNome} onChange={(v) => { setAparelhoNome(v); setAparelhoId(modelos.find((m) => m.MODELO === v)?.id ?? null); }} options={modelos.map((m) => m.MODELO)} placeholder="Produto (Modelo+RAM+ROM)" icon={Smartphone} required />
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3 items-start">
                     <FixedSelect value={corNome} onChange={(v) => { setCorNome(v); setCorId(cores.find((c) => c.COR_BR === v)?.id ?? null); }} options={cores.map((c) => c.COR_BR)} placeholder="Cor" icon={Palette} required />
-                    <TextField value={imei} onChange={(v) => setImei(v.replace(/\D/g, "").slice(0, 15))} placeholder="IMEI 1" mono required/>
+                    <div>
+                      <TextField value={imei} onChange={(v) => setImei(v.replace(/\D/g, "").slice(0, 15))} placeholder="IMEI 1" mono required maxLength={15} />
+                      {imeiValidando && <div className="text-[11px] text-[#6B7699] mt-1 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Verificando…</div>}
+                      {!imeiValidando && imeiValido === true && <div className="text-[11px] text-[#1F8A70] mt-1">✓ IMEI encontrado na base</div>}
+                      {!imeiValidando && imeiValido === false && <div className="text-[11px] text-red-700 mt-1">IMEI inválido, inexistente na base</div>}
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <TextField value={imei2} onChange={(v) => setImei2(v.replace(/\D/g, "").slice(0, 15))} placeholder="IMEI 2 (opcional)" mono/>
+                    <TextField value={imei2} onChange={(v) => setImei2(v.replace(/\D/g, "").slice(0, 15))} placeholder="IMEI 2 (opcional)" mono maxLength={15}/>
                     <TextField value={numeroNota} onChange={setNumeroNota} placeholder="Número da nota" mono required/>
                   </div>
                   <div className="grid grid-cols-2 gap-3">

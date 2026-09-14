@@ -126,6 +126,7 @@ export function TextField({
   mono,
   required,
   inputMode,
+  maxLength,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -133,11 +134,13 @@ export function TextField({
   mono?: boolean;
   required?: boolean;
   inputMode?: "numeric" | "text";
+  maxLength?: number;
 }) {
   return (
     <input
       value={value}
       inputMode={inputMode}
+      maxLength={maxLength}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder + (required ? " *" : "")}
       className="w-full rounded-md border border-[#DCE1F5] bg-white py-2.5 px-3 text-sm outline-none text-[#0B1440]"
