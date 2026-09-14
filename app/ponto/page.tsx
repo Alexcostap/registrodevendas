@@ -139,6 +139,23 @@ export default function PontoPage() {
     setHoraJustificativa("");
   }
 
+  // Tenta pegar a localização do navegador. Se o promotor negar
+  // permissão, o GPS falhar ou demorar demais, devolve null — NUNCA
+  // trava o registro de ponto por causa disso.
+  function obterLocalizacao(): Promise<{ lat: number; lng: number } | null> {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (posicao) => resolve({ lat: posicao.coords.latitude, lng: posicao.coords.longitude }),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    });
+  }
+
   async function handleRegistrarEntrada() {
     setErroEnvio("");
     if (!lojaId || !foto || !promotorId) {
@@ -147,9 +164,16 @@ export default function PontoPage() {
     }
     setEnviando(true);
 
-    const caminho = `${promotorId}/${Date.now()}-entrada-${foto.name}`;
-    const { error: erroUpload } = await supabase.storage.from("fotos-ponto").upload(caminho, foto);
-    if (erroUpload) {
+    const [caminhoResultado, localizacao] = await Promise.all([
+      (async () => {
+        const caminho = `${promotorId}/${Date.now()}-entrada-${foto.name}`;
+        const { error } = await supabase.storage.from("fotos-ponto").upload(caminho, foto);
+        return error ? null : caminho;
+      })(),
+      obterLocalizacao(),
+    ]);
+
+    if (!caminhoResultado) {
       setEnviando(false);
       setErroEnvio("Não foi possível enviar a foto. Tente novamente.");
       return;
@@ -158,7 +182,9 @@ export default function PontoPage() {
     const { error } = await supabase.schema("JOVI").from("Ponto").insert({
       promotor_id: promotorId,
       loja_id: lojaId,
-      foto_entrada_url: caminho,
+      foto_entrada_url: caminhoResultado,
+      latitude_entrada: localizacao?.lat ?? null,
+      longitude_entrada: localizacao?.lng ?? null,
     });
     setEnviando(false);
 
@@ -178,9 +204,16 @@ export default function PontoPage() {
     }
     setEnviando(true);
 
-    const caminho = `${promotorId}/${Date.now()}-saida-${fotoSaida.name}`;
-    const { error: erroUpload } = await supabase.storage.from("fotos-ponto").upload(caminho, fotoSaida);
-    if (erroUpload) {
+    const [caminhoResultado, localizacao] = await Promise.all([
+      (async () => {
+        const caminho = `${promotorId}/${Date.now()}-saida-${fotoSaida.name}`;
+        const { error } = await supabase.storage.from("fotos-ponto").upload(caminho, fotoSaida);
+        return error ? null : caminho;
+      })(),
+      obterLocalizacao(),
+    ]);
+
+    if (!caminhoResultado) {
       setEnviando(false);
       setErroEnvio("Não foi possível enviar a foto. Tente novamente.");
       return;
@@ -189,7 +222,12 @@ export default function PontoPage() {
     const { error } = await supabase
       .schema("JOVI")
       .from("Ponto")
-      .update({ data_hora_saida: new Date().toISOString(), foto_saida_url: caminho })
+      .update({
+        data_hora_saida: new Date().toISOString(),
+        foto_saida_url: caminhoResultado,
+        latitude_saida: localizacao?.lat ?? null,
+        longitude_saida: localizacao?.lng ?? null,
+      })
       .eq("id", turnoAberto.id);
     setEnviando(false);
 
