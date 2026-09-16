@@ -113,7 +113,9 @@ export default function VendaPage() {
   const [valor, setValor] = useState("");
 
   // Assim que o IMEI 1 completa 15 dígitos (digitado ou vindo do OCR),
-  // confere se ele existe na base oficial de IMEIs.
+  // confere se ele existe na base oficial de IMEIs — na coluna IMEI OU
+  // IMEI2 (aparelhos dual-chip podem ter o número em qualquer uma) —
+  // e, se achar, já preenche Modelo e Cor sozinho.
   useEffect(() => {
     if (imei.length !== 15) {
       setImeiValido(null);
@@ -126,12 +128,25 @@ export default function VendaPage() {
       const { data } = await supabase
         .schema("JOVI")
         .from("Base_IMEI")
-        .select("IMEI")
-        .eq("IMEI", imei)
-        .maybeSingle();
+        .select("IMEI, IMEI2, MODELO, COR")
+        .or(`IMEI.eq.${imei},IMEI2.eq.${imei}`)
+        .limit(1);
       if (cancelado) return;
+      const registro = (data && data[0]) || null;
       setImeiValidando(false);
-      setImeiValido(!!data);
+      setImeiValido(!!registro);
+
+      if (registro) {
+        if (registro.MODELO) aplicarModeloPorNome(String(registro.MODELO));
+        if (registro.COR) {
+          const corTexto = String(registro.COR).toLowerCase();
+          const corEncontrada = cores.find((c) => c.COR.toLowerCase() === corTexto || c.COR_BR.toLowerCase() === corTexto);
+          if (corEncontrada) {
+            setCorNome(corEncontrada.COR_BR);
+            setCorId(corEncontrada.id);
+          }
+        }
+      }
     })();
     return () => {
       cancelado = true;
@@ -207,7 +222,7 @@ export default function VendaPage() {
         file,
         `Esta é uma nota fiscal de venda de aparelho celular. Extraia os dados e responda APENAS com um objeto JSON válido (sem markdown, sem texto extra), no formato: {"numero_nota": string ou null, "data_venda": string "DD/MM/AAAA" ou null, "valor": string apenas números (ex: 2500.00) ou null}. Se não conseguir ler algum campo com confiança, use null nele.`
       );
-      if (parsed.numero_nota) setNumeroNota(String(parsed.numero_nota));
+      if (parsed.numero_nota) setNumeroNota(String(parsed.numero_nota).replace(/\D/g, ""));
       if (parsed.data_venda) {
         const iso = dataBRparaISO(String(parsed.data_venda));
         const hojeISO = new Date().toISOString().slice(0, 10);
@@ -459,7 +474,7 @@ export default function VendaPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <TextField value={imei2} onChange={(v) => setImei2(v.replace(/\D/g, "").slice(0, 15))} placeholder="IMEI 2 (opcional)" mono maxLength={15}/>
-                    <TextField value={numeroNota} onChange={setNumeroNota} placeholder="Número da nota" mono required/>
+                    <TextField value={numeroNota} onChange={(v) => setNumeroNota(v.replace(/\D/g, ""))} placeholder="Número da nota" mono required/>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <TextField value={valor} onChange={setValor} placeholder="Valor (R$)" mono required />
