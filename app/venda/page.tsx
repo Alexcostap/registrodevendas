@@ -137,6 +137,19 @@ export default function VendaPage() {
       setImeiValido(!!registro);
 
       if (registro) {
+        const imeiPrincipal = registro.IMEI ? String(registro.IMEI) : "";
+        const imeiSecundario = registro.IMEI2 ? String(registro.IMEI2) : "";
+
+        if (imeiPrincipal && imeiPrincipal !== imei) {
+          // o que foi digitado no campo IMEI 1 é, na verdade, o IMEI2
+          // desse aparelho — reescreve os dois campos no lugar certo.
+          setImei(imeiPrincipal);
+          setImei2(imei);
+        } else if (imeiSecundario) {
+          // caso normal: já preenche o IMEI2 também, já que veio junto
+          setImei2(imeiSecundario);
+        }
+
         if (registro.MODELO) aplicarModeloPorNome(String(registro.MODELO));
         if (registro.COR) {
           const corTexto = String(registro.COR).toLowerCase();

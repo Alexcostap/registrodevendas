@@ -2,13 +2,15 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Store, MapPin, Building2, Smartphone, Palette, Minus, Plus, Check, Loader2, AlertCircle, PlusCircle, X } from "lucide-react";
+import { Store, MapPin, Building2, Smartphone, Palette, Minus, Plus, Check, Loader2, AlertCircle, PlusCircle, X, Users, Clock3 } from "lucide-react";
 import { createClient } from "../../lib/supabase/client";
 import { Shell, Header, TypeableSelect, FixedSelect } from "../_components/ui";
 
 type LojaRow = { id: number; CUSTOMER: string; UF: string; CIDADE: string; LOJA: string };
 type ModeloRow = { id: number; MODELO: string };
 type CorRow = { id: number; COR: string; COR_BR: string };
+type PromotorEquipe = { id: number; NOME_COMPLETO: string; auth_user_id: string | null };
+type ResumoLojaEquipe = { lojaId: number; nomeLoja: string; totalEstoque: number; nomePromotor: string; ultimaAtualizacao: string };
 
 type ItemEstoque = {
   modeloNome: string;
@@ -34,6 +36,15 @@ function EstoqueConteudo() {
   const [carregandoReferencia, setCarregandoReferencia] = useState(true);
   const [erroReferencia, setErroReferencia] = useState("");
 
+  // ---- papel: supervisor/gestor têm uma aba extra de visão da equipe ----
+  const [ehSupervisor, setEhSupervisor] = useState(false);
+  const [ehGestor, setEhGestor] = useState(false);
+  const [equipe, setEquipe] = useState<PromotorEquipe[]>([]);
+  const [aba, setAba] = useState<"registrar" | "equipe">("registrar");
+  const [resumoEquipe, setResumoEquipe] = useState<ResumoLojaEquipe[]>([]);
+  const [carregandoResumo, setCarregandoResumo] = useState(false);
+  const [erroResumo, setErroResumo] = useState("");
+
   useEffect(() => {
     (async () => {
       try {
@@ -57,6 +68,43 @@ function EstoqueConteudo() {
             setEtapa("form");
           }
         }
+
+        // detecta se é supervisor (equipe própria) ou gestor (todo mundo)
+        const { data: userData } = await supabase.auth.getUser();
+        const uid = userData.user?.id;
+        if (uid) {
+          const { data: supervisor } = await supabase
+            .schema("JOVI")
+            .from("Supervisores")
+            .select("id")
+            .eq("auth_user_id", uid)
+            .maybeSingle();
+
+          if (supervisor) {
+            setEhSupervisor(true);
+            const { data: equipeRes } = await supabase
+              .schema("JOVI")
+              .from("Promotores")
+              .select("id, NOME_COMPLETO, auth_user_id")
+              .eq("SUPERVISOR", (supervisor as any).id);
+            setEquipe((equipeRes as any) || []);
+          } else {
+            const { data: promotorProprio } = await supabase
+              .schema("JOVI")
+              .from("Promotores")
+              .select("is_gestor")
+              .eq("auth_user_id", uid)
+              .maybeSingle();
+            if (promotorProprio?.is_gestor) {
+              setEhGestor(true);
+              const { data: equipeRes } = await supabase
+                .schema("JOVI")
+                .from("Promotores")
+                .select("id, NOME_COMPLETO, auth_user_id");
+              setEquipe((equipeRes as any) || []);
+            }
+          }
+        }
       } catch (e) {
         setErroReferencia("Não foi possível carregar os dados. Recarregue a página.");
       } finally {
@@ -76,6 +124,62 @@ function EstoqueConteudo() {
   const ufsDisponiveis = rede ? [...new Set(lojas.filter((l) => l.CUSTOMER === rede).map((l) => l.UF))] : [];
   const cidadesDisponiveis = rede && uf ? [...new Set(lojas.filter((l) => l.CUSTOMER === rede && l.UF === uf).map((l) => l.CIDADE))] : [];
   const lojasDisponiveis = rede && uf && cidade ? lojas.filter((l) => l.CUSTOMER === rede && l.UF === uf && l.CIDADE === cidade).map((l) => l.LOJA) : [];
+
+  async function carregarResumoEquipe() {
+    setCarregandoResumo(true);
+    setErroResumo("");
+    try {
+      const authUserIds = new Set(equipe.map((p) => p.auth_user_id).filter(Boolean) as string[]);
+      const { data, error } = await supabase
+        .schema("JOVI")
+        .from("Estoque")
+        .select("loja_id, quantidade, atualizado_por, atualizado_em");
+      if (error) throw error;
+
+      const linhasDaEquipe = ((data as any) || []).filter(
+        (r: any) => r.atualizado_por && authUserIds.has(r.atualizado_por)
+      );
+
+      const porLoja = new Map<number, { total: number; maisRecente: any }>();
+      for (const linha of linhasDaEquipe) {
+        const atual = porLoja.get(linha.loja_id) || { total: 0, maisRecente: linha };
+        atual.total += linha.quantidade || 0;
+        if (new Date(linha.atualizado_em) > new Date(atual.maisRecente.atualizado_em)) {
+          atual.maisRecente = linha;
+        }
+        porLoja.set(linha.loja_id, atual);
+      }
+
+      const resumo: ResumoLojaEquipe[] = Array.from(porLoja.entries())
+        .map(([lojaId, info]) => {
+          const loja = lojas.find((l) => l.id === lojaId);
+          const promotor = equipe.find((p) => p.auth_user_id === info.maisRecente.atualizado_por);
+          return {
+            lojaId,
+            nomeLoja: loja ? `${loja.CIDADE} — ${loja.LOJA}` : "—",
+            totalEstoque: info.total,
+            nomePromotor: promotor?.NOME_COMPLETO || "—",
+            ultimaAtualizacao: info.maisRecente.atualizado_em,
+          };
+        })
+        .sort((a, b) => b.ultimaAtualizacao.localeCompare(a.ultimaAtualizacao));
+
+      setResumoEquipe(resumo);
+    } catch (e) {
+      setErroResumo("Não foi possível carregar o resumo da equipe.");
+    } finally {
+      setCarregandoResumo(false);
+    }
+  }
+
+  function abrirAbaEquipe() {
+    setAba("equipe");
+    if (resumoEquipe.length === 0) carregarResumoEquipe();
+  }
+
+  function formatarDataHora(iso: string) {
+    return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+  }
 
   function selecionarLoja(nome: string) {
     setLojaNome(nome);
@@ -205,13 +309,65 @@ function EstoqueConteudo() {
   if (etapa === "loja") {
     return (
       <Shell>
-        <Header title="Qual loja?" backHref="/" />
-        <div className="space-y-3">
-          <FixedSelect value={rede} onChange={(v) => { setRede(v); setUf(""); setCidade(""); selecionarLoja(""); }} options={redesDisponiveis} placeholder="Rede" icon={Building2} />
-          {rede && <FixedSelect value={uf} onChange={(v) => { setUf(v); setCidade(""); selecionarLoja(""); }} options={ufsDisponiveis} placeholder="UF" icon={MapPin} />}
-          {rede && uf && <FixedSelect value={cidade} onChange={(v) => { setCidade(v); selecionarLoja(""); }} options={cidadesDisponiveis} placeholder="Cidade" icon={MapPin} />}
-          {rede && uf && cidade && <FixedSelect value={lojaNome} onChange={selecionarLoja} options={lojasDisponiveis} placeholder="Loja" icon={Store} />}
-        </div>
+        <Header title="Atualizar estoque" backHref="/" />
+
+        {(ehSupervisor || ehGestor) && (
+          <div className="flex gap-2 mb-5">
+            <button
+              onClick={() => setAba("registrar")}
+              className="flex-1 rounded-md py-2 text-sm font-semibold border"
+              style={{ background: aba === "registrar" ? "#1E46E6" : "#FFFFFF", color: aba === "registrar" ? "#FFFFFF" : "#0B1440", borderColor: "#DCE1F5" }}
+            >
+              Registrar
+            </button>
+            <button
+              onClick={abrirAbaEquipe}
+              className="flex-1 rounded-md py-2 text-sm font-semibold border"
+              style={{ background: aba === "equipe" ? "#1E46E6" : "#FFFFFF", color: aba === "equipe" ? "#FFFFFF" : "#0B1440", borderColor: "#DCE1F5" }}
+            >
+              Visão da equipe
+            </button>
+          </div>
+        )}
+
+        {aba === "equipe" ? (
+          <div>
+            {carregandoResumo && (
+              <div className="flex items-center justify-center py-10 text-[#6B7699] gap-2">
+                <Loader2 size={18} className="animate-spin" /> Carregando…
+              </div>
+            )}
+            {erroResumo && <div className="text-sm text-red-700 bg-red-50 rounded-md p-3">{erroResumo}</div>}
+            {!carregandoResumo && !erroResumo && resumoEquipe.length === 0 && (
+              <p className="text-sm text-[#6B7699]">Nenhum estoque atualizado pela equipe ainda.</p>
+            )}
+            <div className="space-y-2">
+              {resumoEquipe.map((r) => (
+                <div key={r.lojaId} className="rounded-lg border border-[#DCE1F5] bg-white p-4">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-[#1E46E6] mb-1">
+                    <Store size={12} /> {r.nomeLoja}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-sm text-[#0B1440]">
+                      <Users size={14} className="text-[#6B7699]" /> {r.nomePromotor}
+                    </div>
+                    <div className="fonte-mono text-lg font-bold text-[#0B1440]">{r.totalEstoque} un.</div>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-[#6B7699] mt-1">
+                    <Clock3 size={11} /> Última atualização: {formatarDataHora(r.ultimaAtualizacao)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <FixedSelect value={rede} onChange={(v) => { setRede(v); setUf(""); setCidade(""); selecionarLoja(""); }} options={redesDisponiveis} placeholder="Rede" icon={Building2} />
+            {rede && <FixedSelect value={uf} onChange={(v) => { setUf(v); setCidade(""); selecionarLoja(""); }} options={ufsDisponiveis} placeholder="UF" icon={MapPin} />}
+            {rede && uf && <FixedSelect value={cidade} onChange={(v) => { setCidade(v); selecionarLoja(""); }} options={cidadesDisponiveis} placeholder="Cidade" icon={MapPin} />}
+            {rede && uf && cidade && <FixedSelect value={lojaNome} onChange={selecionarLoja} options={lojasDisponiveis} placeholder="Loja" icon={Store} />}
+          </div>
+        )}
       </Shell>
     );
   }

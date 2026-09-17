@@ -229,6 +229,20 @@ export default function EscalaPage() {
     await carregarEscalas(modoGestor ? null : supervisorId);
   }
 
+  // ---- filtros da listagem ----
+  const [filtroPromotorNome, setFiltroPromotorNome] = useState("");
+  const [filtroDataDe, setFiltroDataDe] = useState("");
+  const [filtroDataAte, setFiltroDataAte] = useState("");
+
+  const promotoresOrdenados = [...promotores].sort((a, b) => a.NOME_COMPLETO.localeCompare(b.NOME_COMPLETO, "pt-BR"));
+
+  const escalasFiltradas = escalas.filter((e) => {
+    if (filtroPromotorNome && nomePromotor(e.promotor_id) !== filtroPromotorNome) return false;
+    if (filtroDataDe && e.dia < filtroDataDe) return false;
+    if (filtroDataAte && e.dia > filtroDataAte) return false;
+    return true;
+  });
+
   function nomePromotor(id: number) {
     return promotores.find((p) => p.id === id)?.NOME_COMPLETO || "—";
   }
@@ -373,9 +387,30 @@ export default function EscalaPage() {
       </div>
 
       <div className="fonte-titulo text-sm font-bold text-[#0B1440] mb-3">Apontamentos cadastrados</div>
-      {escalas.length === 0 && <p className="text-sm text-[#6B7699]">Nenhum apontamento cadastrado ainda.</p>}
+
+      <div className="rounded-lg border border-[#DCE1F5] bg-white p-4 mb-4 space-y-3">
+        <FixedSelect
+          value={filtroPromotorNome}
+          onChange={setFiltroPromotorNome}
+          options={promotoresOrdenados.map((p) => p.NOME_COMPLETO)}
+          placeholder="Filtrar por promotor (todos)"
+          icon={User}
+        />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] text-[#6B7699] mb-1">De</label>
+            <input type="date" value={filtroDataDe} onChange={(e) => setFiltroDataDe(e.target.value)} className="w-full rounded-md border border-[#DCE1F5] bg-white py-2 px-3 text-sm outline-none text-[#0B1440]" />
+          </div>
+          <div>
+            <label className="block text-[10px] text-[#6B7699] mb-1">Até</label>
+            <input type="date" value={filtroDataAte} onChange={(e) => setFiltroDataAte(e.target.value)} className="w-full rounded-md border border-[#DCE1F5] bg-white py-2 px-3 text-sm outline-none text-[#0B1440]" />
+          </div>
+        </div>
+      </div>
+
+      {escalasFiltradas.length === 0 && <p className="text-sm text-[#6B7699]">Nenhum apontamento encontrado com esses filtros.</p>}
       <div className="space-y-2">
-        {escalas.map((e) => (
+        {escalasFiltradas.map((e) => (
           <div key={e.id} className="rounded-lg border border-[#DCE1F5] bg-white p-4 flex items-start justify-between gap-3">
             <div>
               <div className="fonte-mono text-xs font-bold text-[#1E46E6] mb-1">{formatarQuando(e)}</div>
