@@ -78,7 +78,7 @@ export default function HomeClient({
           </div>
         </Link>
 
-        {ehPromotor && (
+        {(ehPromotor || ehSupervisor) && (
           <Link
             href="/ponto"
             className="w-full rounded-xl p-5 flex items-center gap-4 text-white"

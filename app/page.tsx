@@ -28,22 +28,24 @@ export default async function HomePage() {
   const ehPromotor = !!promotor;
   const ehGestor = !!promotor?.is_gestor;
   let ehSupervisor = false;
+  let supervisorId: number | null = null;
 
   if (!nomeCompleto) {
     const { data: supervisor } = await supabase
       .schema("JOVI")
       .from("Supervisores")
-      .select("NOME_COMPLETO")
+      .select("id, NOME_COMPLETO")
       .eq("auth_user_id", user!.id)
       .maybeSingle();
     nomeCompleto = supervisor?.NOME_COMPLETO;
     ehSupervisor = !!supervisor;
+    supervisorId = supervisor?.id ?? null;
   }
 
   const nomeExibido = nomeCompleto ? primeiroNomeCapitalizado(nomeCompleto) : "Promotor";
 
-  // Só promotores registram ponto — e só checamos se tem turno aberto
-  // quando a pessoa É promotor, pra não gastar consulta à toa.
+  // Promotores e supervisores registram ponto, cada um na própria
+  // tabela — só checamos a que for relevante pra pessoa logada.
   let turnoAberto = null;
   if (promotor) {
     const { data } = await supabase
@@ -51,6 +53,15 @@ export default async function HomePage() {
       .from("Ponto")
       .select("id, data_hora_entrada, loja_id")
       .eq("promotor_id", promotor.id)
+      .is("data_hora_saida", null)
+      .maybeSingle();
+    turnoAberto = data;
+  } else if (supervisorId) {
+    const { data } = await supabase
+      .schema("JOVI")
+      .from("Ponto_Supervisor")
+      .select("id, data_hora_entrada, loja_id")
+      .eq("supervisor_id", supervisorId)
       .is("data_hora_saida", null)
       .maybeSingle();
     turnoAberto = data;

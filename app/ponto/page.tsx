@@ -12,7 +12,9 @@ export default function PontoPage() {
   const supabase = createClient();
 
   const [lojas, setLojas] = useState<LojaRow[]>([]);
-  const [promotorId, setPromotorId] = useState<number | null>(null);
+  const [entidadeId, setEntidadeId] = useState<number | null>(null);
+  const [tabelaPonto, setTabelaPonto] = useState<"Ponto" | "Ponto_Supervisor">("Ponto");
+  const [colunaId, setColunaId] = useState<"promotor_id" | "supervisor_id">("promotor_id");
   const [turnoAberto, setTurnoAberto] = useState<TurnoAberto | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erroCarregar, setErroCarregar] = useState("");
@@ -31,20 +33,42 @@ export default function PontoPage() {
           .eq("auth_user_id", uid)
           .maybeSingle();
 
-        if (!promotor) {
-          setErroCarregar("Só promotores registram ponto.");
+        let tabela: "Ponto" | "Ponto_Supervisor" = "Ponto";
+        let coluna: "promotor_id" | "supervisor_id" = "promotor_id";
+        let id: number | null = null;
+
+        if (promotor) {
+          id = (promotor as any).id;
+        } else {
+          const { data: supervisor } = await supabase
+            .schema("JOVI")
+            .from("Supervisores")
+            .select("id")
+            .eq("auth_user_id", uid)
+            .maybeSingle();
+          if (supervisor) {
+            tabela = "Ponto_Supervisor";
+            coluna = "supervisor_id";
+            id = (supervisor as any).id;
+          }
+        }
+
+        if (id === null) {
+          setErroCarregar("Só promotores ou supervisores registram ponto.");
           setCarregando(false);
           return;
         }
-        setPromotorId((promotor as any).id);
+        setEntidadeId(id);
+        setTabelaPonto(tabela);
+        setColunaId(coluna);
 
         const [lojasRes, turnoRes] = await Promise.all([
           supabase.schema("JOVI").from("Lojas").select("id:ID, CUSTOMER, UF, CIDADE, LOJA"),
           supabase
             .schema("JOVI")
-            .from("Ponto")
+            .from(tabela)
             .select("id, data_hora_entrada, loja_id")
-            .eq("promotor_id", (promotor as any).id)
+            .eq(coluna, id)
             .is("data_hora_saida", null)
             .maybeSingle(),
         ]);
@@ -124,7 +148,7 @@ export default function PontoPage() {
 
     const { error } = await supabase
       .schema("JOVI")
-      .from("Ponto")
+      .from(tabelaPonto)
       .update({ data_hora_saida: dataHoraSaida, justificativa_saida: motivoJustificativa.trim() })
       .eq("id", turnoAberto.id);
     setEnviandoJustificativa(false);
@@ -158,7 +182,7 @@ export default function PontoPage() {
 
   async function handleRegistrarEntrada() {
     setErroEnvio("");
-    if (!lojaId || !foto || !promotorId) {
+    if (!lojaId || !foto || !entidadeId) {
       setErroEnvio("Escolha a loja e tire a foto antes de continuar.");
       return;
     }
@@ -166,7 +190,7 @@ export default function PontoPage() {
 
     const [caminhoResultado, localizacao] = await Promise.all([
       (async () => {
-        const caminho = `${promotorId}/${Date.now()}-entrada-${foto.name}`;
+        const caminho = `${entidadeId}/${Date.now()}-entrada-${foto.name}`;
         const { error } = await supabase.storage.from("fotos-ponto").upload(caminho, foto);
         return error ? null : caminho;
       })(),
@@ -179,8 +203,8 @@ export default function PontoPage() {
       return;
     }
 
-    const { error } = await supabase.schema("JOVI").from("Ponto").insert({
-      promotor_id: promotorId,
+    const { error } = await supabase.schema("JOVI").from(tabelaPonto).insert({
+      [colunaId]: entidadeId,
       loja_id: lojaId,
       foto_entrada_url: caminhoResultado,
       latitude_entrada: localizacao?.lat ?? null,
@@ -196,7 +220,7 @@ export default function PontoPage() {
   }
 
   async function handleRegistrarSaida() {
-    if (!turnoAberto || !promotorId) return;
+    if (!turnoAberto || !entidadeId) return;
     setErroEnvio("");
     if (!fotoSaida) {
       setErroEnvio("Tire a foto antes de registrar a saída.");
@@ -206,7 +230,7 @@ export default function PontoPage() {
 
     const [caminhoResultado, localizacao] = await Promise.all([
       (async () => {
-        const caminho = `${promotorId}/${Date.now()}-saida-${fotoSaida.name}`;
+        const caminho = `${entidadeId}/${Date.now()}-saida-${fotoSaida.name}`;
         const { error } = await supabase.storage.from("fotos-ponto").upload(caminho, fotoSaida);
         return error ? null : caminho;
       })(),
@@ -221,7 +245,7 @@ export default function PontoPage() {
 
     const { error } = await supabase
       .schema("JOVI")
-      .from("Ponto")
+      .from(tabelaPonto)
       .update({
         data_hora_saida: new Date().toISOString(),
         foto_saida_url: caminhoResultado,
