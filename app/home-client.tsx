@@ -81,7 +81,7 @@ export default function HomeClient({
         {(ehPromotor || ehSupervisor) && (
           <Link
             href="/ponto"
-            className="w-full rounded-xl p-5 flex items-center gap-4 text-white"
+            className="w-full rounded-xl p-5 mb-6 flex items-center gap-4 text-white"
             style={{ background: turnoAberto ? "#1F8A70" : "#E8601C" }}
           >
             {turnoAberto ? <Clock size={28} /> : <LogIn size={28} />}

@@ -1,12 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Store, MapPin, Building2, Camera, Loader2, AlertCircle, Check, Clock, MessageSquareWarning } from "lucide-react";
+import { Store, MapPin, Building2, Camera, Loader2, AlertCircle, Check, Clock, MessageSquareWarning, Users, User, ChevronRight } from "lucide-react";
 import { createClient } from "../../lib/supabase/client";
 import { Shell, Header, TypeableSelect, FixedSelect } from "../_components/ui";
 
 type LojaRow = { id: number; CUSTOMER: string; UF: string; CIDADE: string; LOJA: string };
 type TurnoAberto = { id: number; data_hora_entrada: string; loja_id: number };
+type PromotorEquipe = { id: number; NOME_COMPLETO: string };
+type PontoResultado = {
+  id: number;
+  promotor_id: number;
+  loja_id: number;
+  data_hora_entrada: string;
+  data_hora_saida: string | null;
+  foto_entrada_url: string | null;
+  foto_saida_url: string | null;
+};
 
 export default function PontoPage() {
   const supabase = createClient();
@@ -19,6 +29,12 @@ export default function PontoPage() {
   const [carregando, setCarregando] = useState(true);
   const [erroCarregar, setErroCarregar] = useState("");
 
+  // ---- visão da equipe (só supervisor/gestor) ----
+  const [ehSupervisorReal, setEhSupervisorReal] = useState(false);
+  const [ehGestorPonto, setEhGestorPonto] = useState(false);
+  const [equipe, setEquipe] = useState<PromotorEquipe[]>([]);
+  const [aba, setAba] = useState<"registrar" | "equipe">("registrar");
+
   useEffect(() => {
     (async () => {
       try {
@@ -29,7 +45,7 @@ export default function PontoPage() {
         const { data: promotor } = await supabase
           .schema("JOVI")
           .from("Promotores")
-          .select("id")
+          .select("id, is_gestor")
           .eq("auth_user_id", uid)
           .maybeSingle();
 
@@ -39,6 +55,15 @@ export default function PontoPage() {
 
         if (promotor) {
           id = (promotor as any).id;
+          if ((promotor as any).is_gestor) {
+            setEhGestorPonto(true);
+            const { data: todosPromotores } = await supabase
+              .schema("JOVI")
+              .from("Promotores")
+              .select("id, NOME_COMPLETO")
+              .order("NOME_COMPLETO");
+            setEquipe((todosPromotores as any) || []);
+          }
         } else {
           const { data: supervisor } = await supabase
             .schema("JOVI")
@@ -50,6 +75,14 @@ export default function PontoPage() {
             tabela = "Ponto_Supervisor";
             coluna = "supervisor_id";
             id = (supervisor as any).id;
+            setEhSupervisorReal(true);
+            const { data: minhaEquipe } = await supabase
+              .schema("JOVI")
+              .from("Promotores")
+              .select("id, NOME_COMPLETO")
+              .eq("SUPERVISOR", id)
+              .order("NOME_COMPLETO");
+            setEquipe((minhaEquipe as any) || []);
           }
         }
 
@@ -102,6 +135,80 @@ export default function PontoPage() {
   const [horaJustificativa, setHoraJustificativa] = useState("");
   const [enviandoJustificativa, setEnviandoJustificativa] = useState(false);
   const [erroJustificativa, setErroJustificativa] = useState("");
+
+  // ---- busca na visão da equipe (só dispara ao clicar em Buscar) ----
+  const [buscaPromotorNome, setBuscaPromotorNome] = useState("");
+  const [buscaPromotorId, setBuscaPromotorId] = useState<number | null>(null);
+  const [buscaDataEntrada, setBuscaDataEntrada] = useState("");
+  const [buscaDataSaida, setBuscaDataSaida] = useState("");
+  const [buscando, setBuscando] = useState(false);
+  const [jaBuscou, setJaBuscou] = useState(false);
+  const [erroBusca, setErroBusca] = useState("");
+  const [resultadosBusca, setResultadosBusca] = useState<PontoResultado[]>([]);
+  const [pontoSelecionado, setPontoSelecionado] = useState<PontoResultado | null>(null);
+  const [urlFotoEntradaDetalhe, setUrlFotoEntradaDetalhe] = useState<string | null>(null);
+  const [urlFotoSaidaDetalhe, setUrlFotoSaidaDetalhe] = useState<string | null>(null);
+  const [carregandoFotosDetalhe, setCarregandoFotosDetalhe] = useState(false);
+
+  const equipeOrdenada = [...equipe].sort((a, b) => a.NOME_COMPLETO.localeCompare(b.NOME_COMPLETO, "pt-BR"));
+  const podeBuscarEquipe = !!buscaPromotorId || !!buscaDataEntrada || !!buscaDataSaida;
+
+  function proximoDia(dataISO: string): string {
+    const d = new Date(dataISO + "T00:00:00");
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  async function buscarPontosEquipe() {
+    setErroBusca("");
+    if (!podeBuscarEquipe) return;
+    setBuscando(true);
+    setJaBuscou(true);
+    let query = supabase
+      .schema("JOVI")
+      .from("Ponto")
+      .select("id, promotor_id, loja_id, data_hora_entrada, data_hora_saida, foto_entrada_url, foto_saida_url")
+      .order("data_hora_entrada", { ascending: false })
+      .limit(50);
+    if (buscaPromotorId) query = query.eq("promotor_id", buscaPromotorId);
+    if (buscaDataEntrada) query = query.gte("data_hora_entrada", `${buscaDataEntrada}T00:00:00`).lt("data_hora_entrada", `${proximoDia(buscaDataEntrada)}T00:00:00`);
+    if (buscaDataSaida) query = query.gte("data_hora_saida", `${buscaDataSaida}T00:00:00`).lt("data_hora_saida", `${proximoDia(buscaDataSaida)}T00:00:00`);
+    const { data, error } = await query;
+    setBuscando(false);
+    if (error) {
+      setErroBusca("Não foi possível buscar. Tente novamente.");
+      return;
+    }
+    setResultadosBusca((data as any) || []);
+  }
+
+  async function abrirDetalhePonto(p: PontoResultado) {
+    setPontoSelecionado(p);
+    setUrlFotoEntradaDetalhe(null);
+    setUrlFotoSaidaDetalhe(null);
+    setCarregandoFotosDetalhe(true);
+    const [entrada, saida] = await Promise.all([
+      p.foto_entrada_url ? supabase.storage.from("fotos-ponto").createSignedUrl(p.foto_entrada_url, 300) : Promise.resolve({ data: null }),
+      p.foto_saida_url ? supabase.storage.from("fotos-ponto").createSignedUrl(p.foto_saida_url, 300) : Promise.resolve({ data: null }),
+    ]);
+    setUrlFotoEntradaDetalhe((entrada as any)?.data?.signedUrl || null);
+    setUrlFotoSaidaDetalhe((saida as any)?.data?.signedUrl || null);
+    setCarregandoFotosDetalhe(false);
+  }
+
+  function nomePromotorEquipe(id: number) {
+    return equipe.find((p) => p.id === id)?.NOME_COMPLETO || "—";
+  }
+
+  function nomeLojaCompleto(id: number) {
+    const l = lojas.find((l) => l.id === id);
+    return l ? `${l.CUSTOMER} — ${l.LOJA}` : "—";
+  }
+
+  function formatarHora(iso: string | null) {
+    if (!iso) return "Em aberto";
+    return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  }
 
   const redesDisponiveis = [...new Set(lojas.map((l) => l.CUSTOMER))];
   const ufsDisponiveis = rede ? [...new Set(lojas.filter((l) => l.CUSTOMER === rede).map((l) => l.UF))] : [];
@@ -311,6 +418,140 @@ export default function PontoPage() {
     );
   }
 
+  const mostrarAbas = ehSupervisorReal || ehGestorPonto;
+  const abasSwitcher = mostrarAbas ? (
+    <div className="flex gap-2 mb-5">
+      <button
+        onClick={() => setAba("registrar")}
+        className="flex-1 rounded-md py-2 text-sm font-semibold border"
+        style={{ background: aba === "registrar" ? "#1E46E6" : "#FFFFFF", color: aba === "registrar" ? "#FFFFFF" : "#0B1440", borderColor: "#DCE1F5" }}
+      >
+        Registrar
+      </button>
+      <button
+        onClick={() => setAba("equipe")}
+        className="flex-1 rounded-md py-2 text-sm font-semibold border"
+        style={{ background: aba === "equipe" ? "#1E46E6" : "#FFFFFF", color: aba === "equipe" ? "#FFFFFF" : "#0B1440", borderColor: "#DCE1F5" }}
+      >
+        Visão da equipe
+      </button>
+    </div>
+  ) : null;
+
+  // ---- detalhe de um ponto da equipe (fotos de entrada/saída) ----
+  if (pontoSelecionado) {
+    return (
+      <Shell>
+        <Header title="Detalhe do ponto" onBack={() => setPontoSelecionado(null)} />
+        <div className="rounded-lg border border-[#DCE1F5] bg-white p-5 space-y-4">
+          <div>
+            <div className="text-xs text-[#6B7699]">Promotor</div>
+            <div className="text-sm font-semibold text-[#0B1440]">{nomePromotorEquipe(pontoSelecionado.promotor_id)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-[#6B7699]">Loja</div>
+            <div className="text-sm text-[#0B1440]">{nomeLojaCompleto(pontoSelecionado.loja_id)}</div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-xs text-[#6B7699]">Entrada</div>
+              <div className="fonte-mono text-sm text-[#0B1440]">{formatarHora(pontoSelecionado.data_hora_entrada)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-[#6B7699]">Saída</div>
+              <div className="fonte-mono text-sm text-[#0B1440]">{formatarHora(pontoSelecionado.data_hora_saida)}</div>
+            </div>
+          </div>
+
+          <div>
+            <div className="fonte-titulo text-sm font-bold text-[#0B1440] mb-2">Fotos</div>
+            {carregandoFotosDetalhe ? (
+              <div className="flex items-center gap-2 text-sm text-[#6B7699]"><Loader2 size={16} className="animate-spin" /> Carregando fotos…</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="text-center">
+                  {urlFotoEntradaDetalhe ? (
+                    <img src={urlFotoEntradaDetalhe} alt="Foto de entrada" className="w-full h-40 object-cover rounded-md border border-[#DCE1F5]" />
+                  ) : (
+                    <div className="w-full h-40 rounded-md border border-dashed border-[#DCE1F5] flex items-center justify-center text-xs text-[#6B7699]">Sem foto</div>
+                  )}
+                  <span className="text-xs text-[#6B7699] mt-1 block">Entrada</span>
+                </div>
+                <div className="text-center">
+                  {urlFotoSaidaDetalhe ? (
+                    <img src={urlFotoSaidaDetalhe} alt="Foto de saída" className="w-full h-40 object-cover rounded-md border border-[#DCE1F5]" />
+                  ) : (
+                    <div className="w-full h-40 rounded-md border border-dashed border-[#DCE1F5] flex items-center justify-center text-xs text-[#6B7699]">Sem foto</div>
+                  )}
+                  <span className="text-xs text-[#6B7699] mt-1 block">Saída</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ---- visão da equipe: só busca sob demanda, nunca lista tudo de cara ----
+  if (aba === "equipe" && mostrarAbas) {
+    return (
+      <Shell>
+        <Header title="Visão da equipe" backHref="/" />
+        {abasSwitcher}
+
+        <div className="rounded-lg border border-[#DCE1F5] bg-white p-4 mb-4 space-y-3">
+          <FixedSelect
+            value={buscaPromotorNome}
+            onChange={(v) => { setBuscaPromotorNome(v); setBuscaPromotorId(equipe.find((p) => p.NOME_COMPLETO === v)?.id ?? null); }}
+            options={equipeOrdenada.map((p) => p.NOME_COMPLETO)}
+            placeholder="Nome do promotor (opcional)"
+            icon={User}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] text-[#6B7699] mb-1">Data de entrada</label>
+              <input type="date" value={buscaDataEntrada} onChange={(e) => setBuscaDataEntrada(e.target.value)} className="w-full rounded-md border border-[#DCE1F5] bg-white py-2 px-3 text-sm outline-none text-[#0B1440]" />
+            </div>
+            <div>
+              <label className="block text-[10px] text-[#6B7699] mb-1">Data de saída</label>
+              <input type="date" value={buscaDataSaida} onChange={(e) => setBuscaDataSaida(e.target.value)} className="w-full rounded-md border border-[#DCE1F5] bg-white py-2 px-3 text-sm outline-none text-[#0B1440]" />
+            </div>
+          </div>
+          <p className="text-[10px] text-[#6B7699]">Preencha o promotor e/ou uma das datas para buscar.</p>
+
+          {erroBusca && <div className="flex items-start gap-2 text-xs rounded-md px-3 py-2 bg-red-50 text-red-700"><AlertCircle size={14} className="shrink-0 mt-0.5" />{erroBusca}</div>}
+
+          <button disabled={!podeBuscarEquipe || buscando} onClick={buscarPontosEquipe} className="w-full rounded-md py-2.5 text-sm font-semibold flex items-center justify-center gap-2 text-white" style={{ background: podeBuscarEquipe ? "#1E46E6" : "#DCE1F5" }}>
+            {buscando && <Loader2 size={16} className="animate-spin" />}
+            Buscar
+          </button>
+        </div>
+
+        {jaBuscou && !buscando && resultadosBusca.length === 0 && (
+          <p className="text-sm text-[#6B7699]">Nenhum ponto encontrado com esses filtros.</p>
+        )}
+
+        <div className="space-y-2">
+          {resultadosBusca.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => abrirDetalhePonto(p)}
+              className="w-full text-left rounded-lg border border-[#DCE1F5] bg-white p-4 flex items-center justify-between gap-3"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-[#1E46E6] truncate"><Store size={12} className="shrink-0" /> {nomeLojaCompleto(p.loja_id)}</div>
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-[#0B1440] mt-1"><Users size={14} className="text-[#6B7699] shrink-0" /> {nomePromotorEquipe(p.promotor_id)}</div>
+                <div className="fonte-mono text-[11px] text-[#6B7699] mt-1">Entrada: {formatarHora(p.data_hora_entrada)} · Saída: {formatarHora(p.data_hora_saida)}</div>
+              </div>
+              <ChevronRight size={18} className="text-[#6B7699] shrink-0" />
+            </button>
+          ))}
+        </div>
+      </Shell>
+    );
+  }
+
   // ---- turno aberto de um dia anterior: precisa justificar antes de continuar ----
   if (turnoAberto && !foiHoje(turnoAberto.data_hora_entrada)) {
     const lojaDoTurno = lojas.find((l) => l.id === turnoAberto.loja_id);
@@ -369,6 +610,7 @@ export default function PontoPage() {
     return (
       <Shell>
         <Header title="Registro de ponto" backHref="/" />
+        {abasSwitcher}
         <div className="rounded-lg border border-[#DCE1F5] bg-white p-5">
           <div className="text-center mb-5">
             <Clock size={28} className="mx-auto mb-3 text-[#1F8A70]" />
@@ -408,6 +650,7 @@ export default function PontoPage() {
   return (
     <Shell>
       <Header title="Registrar entrada" backHref="/" />
+      {abasSwitcher}
       <div className="rounded-lg border border-[#DCE1F5] bg-white p-5 space-y-4">
         <div>
           <label className="block text-xs font-semibold mb-2 text-[#0B1440]">Loja</label>

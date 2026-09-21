@@ -156,7 +156,7 @@ function EstoqueConteudo() {
           const promotor = equipe.find((p) => p.auth_user_id === info.maisRecente.atualizado_por);
           return {
             lojaId,
-            nomeLoja: loja ? `${loja.CIDADE} — ${loja.LOJA}` : "—",
+            nomeLoja: loja ? `${loja.CUSTOMER} — ${loja.LOJA}` : "—",
             totalEstoque: info.total,
             nomePromotor: promotor?.NOME_COMPLETO || "—",
             ultimaAtualizacao: info.maisRecente.atualizado_em,
