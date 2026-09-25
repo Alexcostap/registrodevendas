@@ -3,10 +3,16 @@
 import { useEffect, useState } from "react";
 import { Store, MapPin, Building2, Camera, Loader2, AlertCircle, Check, Clock, MessageSquareWarning, Users, User, ChevronRight } from "lucide-react";
 import { createClient } from "../../lib/supabase/client";
-import { Shell, Header, TypeableSelect, FixedSelect } from "../_components/ui";
+import { Shell, Header, FixedSelect } from "../_components/ui";
 
 type LojaRow = { id: number; CUSTOMER: string; UF: string; CIDADE: string; LOJA: string };
-type TurnoAberto = { id: number; data_hora_entrada: string; loja_id: number };
+type TurnoAberto = {
+  id: number;
+  data_hora_entrada: string;
+  loja_id: number | null;
+  local_categoria?: string | null;
+  local_outro_texto?: string | null;
+};
 type PromotorEquipe = { id: number; NOME_COMPLETO: string };
 type PontoResultado = {
   id: number;
@@ -17,6 +23,18 @@ type PontoResultado = {
   foto_entrada_url: string | null;
   foto_saida_url: string | null;
 };
+
+// Locais fixos que o SUPERVISOR pode registrar quando não está numa
+// loja (escritório, gráfica, depósito etc). "Outro" libera texto livre.
+const LOCAIS_FIXOS = [
+  "Casa de Ding",
+  "Casa de Caio",
+  "Escritório JOVI",
+  "Escritório Adecco",
+  "Depósito Recife",
+  "Depósito Salvador",
+  "Outro",
+];
 
 export default function PontoPage() {
   const supabase = createClient();
@@ -95,12 +113,17 @@ export default function PontoPage() {
         setTabelaPonto(tabela);
         setColunaId(coluna);
 
+        const colunasTurno =
+          tabela === "Ponto_Supervisor"
+            ? "id, data_hora_entrada, loja_id, local_categoria, local_outro_texto"
+            : "id, data_hora_entrada, loja_id";
+
         const [lojasRes, turnoRes] = await Promise.all([
           supabase.schema("JOVI").from("Lojas").select("id:ID, CUSTOMER, UF, CIDADE, LOJA"),
           supabase
             .schema("JOVI")
             .from(tabela)
-            .select("id, data_hora_entrada, loja_id")
+            .select(colunasTurno)
             .eq(coluna, id)
             .is("data_hora_saida", null)
             .maybeSingle(),
@@ -122,6 +145,10 @@ export default function PontoPage() {
   const [cidade, setCidade] = useState("");
   const [lojaNome, setLojaNome] = useState("");
   const [lojaId, setLojaId] = useState<number | null>(null);
+  // ---- local sem ser loja (só supervisor) ----
+  const [estaEmLoja, setEstaEmLoja] = useState(true);
+  const [localCategoria, setLocalCategoria] = useState("");
+  const [localOutroTexto, setLocalOutroTexto] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
   const [previewFoto, setPreviewFoto] = useState<string | null>(null);
   const [fotoSaida, setFotoSaida] = useState<File | null>(null);
@@ -239,6 +266,15 @@ export default function PontoPage() {
     return new Date(dataISO).toDateString() === new Date().toDateString();
   }
 
+  function descreverLocalTurno(t: TurnoAberto): string {
+    if (t.loja_id) {
+      const l = lojas.find((l) => l.id === t.loja_id);
+      return l ? l.LOJA : "loja";
+    }
+    if (t.local_categoria === "Outro") return t.local_outro_texto || "outro local";
+    return t.local_categoria || "local não informado";
+  }
+
   async function handleJustificarSaida() {
     if (!turnoAberto) return;
     setErroJustificativa("");
@@ -289,8 +325,10 @@ export default function PontoPage() {
 
   async function handleRegistrarEntrada() {
     setErroEnvio("");
-    if (!lojaId || !foto || !entidadeId) {
-      setErroEnvio("Escolha a loja e tire a foto antes de continuar.");
+    const emLojaValido = estaEmLoja && !!lojaId;
+    const semLojaValido = !estaEmLoja && !!localCategoria && (localCategoria !== "Outro" || !!localOutroTexto.trim());
+    if (!foto || !entidadeId || (!emLojaValido && !semLojaValido)) {
+      setErroEnvio(estaEmLoja ? "Escolha a loja e tire a foto antes de continuar." : "Escolha o local e tire a foto antes de continuar.");
       return;
     }
     setEnviando(true);
@@ -310,9 +348,13 @@ export default function PontoPage() {
       return;
     }
 
+    const dadosLocal = estaEmLoja
+      ? { loja_id: lojaId, local_categoria: null, local_outro_texto: null }
+      : { loja_id: null, local_categoria: localCategoria, local_outro_texto: localCategoria === "Outro" ? localOutroTexto.trim() : null };
+
     const { error } = await supabase.schema("JOVI").from(tabelaPonto).insert({
       [colunaId]: entidadeId,
-      loja_id: lojaId,
+      ...dadosLocal,
       foto_entrada_url: caminhoResultado,
       latitude_entrada: localizacao?.lat ?? null,
       longitude_entrada: localizacao?.lng ?? null,
@@ -396,7 +438,7 @@ export default function PontoPage() {
             <Check size={26} color="#FFFFFF" />
           </div>
           <h2 className="fonte-titulo text-lg font-bold text-[#0B1440]">Entrada registrada</h2>
-          <p className="text-sm text-[#6B7699]">{lojaNome} · {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+          <p className="text-sm text-[#6B7699]">{estaEmLoja ? lojaNome : (localCategoria === "Outro" ? localOutroTexto : localCategoria)} · {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
         </div>
         <a href="/" className="block w-full text-center text-sm font-semibold py-2 text-[#1E46E6]">Ir para a Home</a>
       </Shell>
@@ -554,7 +596,6 @@ export default function PontoPage() {
 
   // ---- turno aberto de um dia anterior: precisa justificar antes de continuar ----
   if (turnoAberto && !foiHoje(turnoAberto.data_hora_entrada)) {
-    const lojaDoTurno = lojas.find((l) => l.id === turnoAberto.loja_id);
     return (
       <Shell>
         <Header title="Justificar ponto" backHref="/" />
@@ -563,7 +604,7 @@ export default function PontoPage() {
             <MessageSquareWarning size={28} className="mx-auto mb-3 text-[#E8601C]" />
             <p className="text-sm font-semibold text-[#0B1440]">A saída do dia anterior não foi registrada</p>
             <p className="text-xs text-[#6B7699] mt-1">
-              Entrada em {lojaDoTurno?.LOJA || "loja"} às {new Date(turnoAberto.data_hora_entrada).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              Entrada em {descreverLocalTurno(turnoAberto)} às {new Date(turnoAberto.data_hora_entrada).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
             </p>
           </div>
 
@@ -646,21 +687,58 @@ export default function PontoPage() {
   }
 
   // ---- sem turno aberto: fluxo de entrada ----
-  const podeRegistrar = !!lojaId && !!foto;
+  const podeRegistrar =
+    !!foto &&
+    (estaEmLoja ? !!lojaId : !!localCategoria && (localCategoria !== "Outro" || !!localOutroTexto.trim()));
   return (
     <Shell>
       <Header title="Registrar entrada" backHref="/" />
       {abasSwitcher}
       <div className="rounded-lg border border-[#DCE1F5] bg-white p-5 space-y-4">
-        <div>
-          <label className="block text-xs font-semibold mb-2 text-[#0B1440]">Loja</label>
-          <div className="space-y-3">
-            <FixedSelect value={rede} onChange={(v) => { setRede(v); setUf(""); setCidade(""); selecionarLoja(""); }} options={redesDisponiveis} placeholder="Rede" icon={Building2} />
-            {rede && <FixedSelect value={uf} onChange={(v) => { setUf(v); setCidade(""); selecionarLoja(""); }} options={ufsDisponiveis} placeholder="UF" icon={MapPin} />}
-            {rede && uf && <FixedSelect value={cidade} onChange={(v) => { setCidade(v); selecionarLoja(""); }} options={cidadesDisponiveis} placeholder="Cidade" icon={MapPin} />}
-            {rede && uf && cidade && <FixedSelect value={lojaNome} onChange={selecionarLoja} options={lojasDisponiveis} placeholder="Loja" icon={Store} />}
+        {tabelaPonto === "Ponto_Supervisor" && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setEstaEmLoja(true)}
+              className="flex-1 rounded-md py-2 text-sm font-semibold border"
+              style={{ background: estaEmLoja ? "#1E46E6" : "#FFFFFF", color: estaEmLoja ? "#FFFFFF" : "#0B1440", borderColor: "#DCE1F5" }}
+            >
+              Estou numa loja
+            </button>
+            <button
+              onClick={() => setEstaEmLoja(false)}
+              className="flex-1 rounded-md py-2 text-sm font-semibold border"
+              style={{ background: !estaEmLoja ? "#1E46E6" : "#FFFFFF", color: !estaEmLoja ? "#FFFFFF" : "#0B1440", borderColor: "#DCE1F5" }}
+            >
+              Não estou numa loja
+            </button>
           </div>
-        </div>
+        )}
+
+        {estaEmLoja ? (
+          <div>
+            <label className="block text-xs font-semibold mb-2 text-[#0B1440]">Loja</label>
+            <div className="space-y-3">
+              <FixedSelect value={rede} onChange={(v) => { setRede(v); setUf(""); setCidade(""); selecionarLoja(""); }} options={redesDisponiveis} placeholder="Rede" icon={Building2} />
+              {rede && <FixedSelect value={uf} onChange={(v) => { setUf(v); setCidade(""); selecionarLoja(""); }} options={ufsDisponiveis} placeholder="UF" icon={MapPin} />}
+              {rede && uf && <FixedSelect value={cidade} onChange={(v) => { setCidade(v); selecionarLoja(""); }} options={cidadesDisponiveis} placeholder="Cidade" icon={MapPin} />}
+              {rede && uf && cidade && <FixedSelect value={lojaNome} onChange={selecionarLoja} options={lojasDisponiveis} placeholder="Loja" icon={Store} />}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <label className="block text-xs font-semibold text-[#0B1440]">Local</label>
+            <FixedSelect value={localCategoria} onChange={setLocalCategoria} options={LOCAIS_FIXOS} placeholder="Selecione o local" icon={Building2} />
+            {localCategoria === "Outro" && (
+              <input
+                type="text"
+                value={localOutroTexto}
+                onChange={(e) => setLocalOutroTexto(e.target.value)}
+                placeholder="Descreva onde você está"
+                className="w-full rounded-md border border-[#DCE1F5] bg-white py-2.5 px-3 text-sm outline-none text-[#0B1440]"
+              />
+            )}
+          </div>
+        )}
 
         <div>
           <label className="block text-xs font-semibold mb-2 text-[#0B1440]">Foto na chegada</label>
