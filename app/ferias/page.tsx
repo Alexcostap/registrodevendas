@@ -28,13 +28,14 @@ export default function FeriasPage() {
   const [supervisorId, setSupervisorId] = useState<number | null>(null);
 
   async function carregarPromotores(supId: number | null) {
-    let query = supabase
+    // RLS já filtra sozinha (vínculo direto de SUPERVISOR + território
+    // por UF/cidade) — não precisa (e não deve) filtrar de novo aqui,
+    // senão exclui quem só bate pelo território.
+    const { data } = await supabase
       .schema("JOVI")
       .from("Promotores")
       .select("id, NOME_COMPLETO, SAIDA_FERIAS, VOLTA_FERIAS, FERIAS")
       .order("NOME_COMPLETO");
-    if (supId !== null) query = query.eq("SUPERVISOR", supId);
-    const { data } = await query;
     setPromotores((data as any) || []);
   }
 

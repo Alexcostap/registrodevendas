@@ -98,7 +98,6 @@ export default function PontoPage() {
               .schema("JOVI")
               .from("Promotores")
               .select("id, NOME_COMPLETO")
-              .eq("SUPERVISOR", id)
               .order("NOME_COMPLETO");
             setEquipe((minhaEquipe as any) || []);
           }

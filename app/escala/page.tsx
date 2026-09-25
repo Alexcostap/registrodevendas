@@ -69,7 +69,7 @@ export default function EscalaPage() {
           setSupervisorId(supId);
 
           const [promotoresRes, lojasRes] = await Promise.all([
-            supabase.schema("JOVI").from("Promotores").select("id, NOME_COMPLETO").eq("SUPERVISOR", supId),
+            supabase.schema("JOVI").from("Promotores").select("id, NOME_COMPLETO"),
             supabase.schema("JOVI").from("Lojas").select("id:ID, CUSTOMER, UF, CIDADE, LOJA"),
           ]);
           setPromotores((promotoresRes.data as any) || []);

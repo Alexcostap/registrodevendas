@@ -85,8 +85,7 @@ function EstoqueConteudo() {
             const { data: equipeRes } = await supabase
               .schema("JOVI")
               .from("Promotores")
-              .select("id, NOME_COMPLETO, auth_user_id")
-              .eq("SUPERVISOR", (supervisor as any).id);
+              .select("id, NOME_COMPLETO, auth_user_id");
             setEquipe((equipeRes as any) || []);
           } else {
             const { data: promotorProprio } = await supabase
