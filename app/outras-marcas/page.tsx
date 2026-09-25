@@ -152,7 +152,7 @@ export default function OutrasMarcasPage() {
           </div>
         </div>
 
-        <FixedSelect value={marca} onChange={setMarca} options={["Apple", "Motorola", "Oppo", "Samsung, Venda Total da Loja"]} placeholder="Marca vendida (ex: Motorola, Oppo, Samsung)" required />
+        <FixedSelect value={marca} onChange={setMarca} options={["Apple", "Motorola", "Oppo", "Samsung", "Venda Total da Loja"]} placeholder="Marca vendida (ex: Motorola, Oppo, Samsung)" required />
 
         <div>
           <label className="block text-xs font-semibold mb-2 text-[#0B1440]">Período de apuração</label>
