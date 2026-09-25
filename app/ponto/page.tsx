@@ -347,9 +347,12 @@ export default function PontoPage() {
       return;
     }
 
-    const dadosLocal = estaEmLoja
-      ? { loja_id: lojaId, local_categoria: null, local_outro_texto: null }
-      : { loja_id: null, local_categoria: localCategoria, local_outro_texto: localCategoria === "Outro" ? localOutroTexto.trim() : null };
+    const dadosLocal =
+      tabelaPonto === "Ponto_Supervisor"
+        ? estaEmLoja
+          ? { loja_id: lojaId, local_categoria: null, local_outro_texto: null }
+          : { loja_id: null, local_categoria: localCategoria, local_outro_texto: localCategoria === "Outro" ? localOutroTexto.trim() : null }
+        : { loja_id: lojaId }; // tabela "Ponto" (promotor) não tem essas colunas — nunca mandar
 
     const { error } = await supabase.schema("JOVI").from(tabelaPonto).insert({
       [colunaId]: entidadeId,
