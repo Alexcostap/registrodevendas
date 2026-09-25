@@ -27,8 +27,8 @@ type PontoResultado = {
 // Locais fixos que o SUPERVISOR pode registrar quando não está numa
 // loja (escritório, gráfica, depósito etc). "Outro" libera texto livre.
 const LOCAIS_FIXOS = [
-  "Casa de Ding",
-  "Casa de Caio",
+  "Escritório de apoio Salvador",
+  "Escritório de apoio J. Pessoa",
   "Escritório JOVI",
   "Escritório Adecco",
   "Depósito Recife",
